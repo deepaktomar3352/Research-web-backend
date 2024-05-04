@@ -369,11 +369,11 @@ router.post("/send_comment", (req, res) => {
 
 //fetching user comments
 router.get("/user_comment", (req, res) => {
-  const { user_id } = req.query;
+  const { user_id,paper_id } = req.query;
 
-  const query = 'SELECT * FROM Comments WHERE UserId = ?';
+  const query = 'SELECT * FROM Comments WHERE paper_id = ? OR UserId = ?';
   
-  pool.query(query, [user_id], (err, results) => {
+  pool.query(query, [paper_id,user_id], (err, results) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
@@ -393,11 +393,11 @@ router.get("/user_comment", (req, res) => {
 
 //fetching admin comments
 router.get("/admin_comment", (req, res) => {
-  const { user_id } = req.query;
+  const { paper_id } = req.query;
 
-  const query = 'SELECT * FROM Comments WHERE UserId = ? OR target_user_id = ?';
+  const query = 'SELECT * FROM Comments WHERE paper_id = ?';
   
-  pool.query(query, [user_id,user_id], (err, results) => {
+  pool.query(query, [paper_id], (err, results) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
