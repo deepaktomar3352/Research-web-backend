@@ -345,11 +345,11 @@ router.get("/delete_article", (req, res) => {
 router.post("/send_comment", (req, res) => {
   console.log("Body:", req.body);
 
-  const { user_id, is_admin_comment, comment } = req.body;
+  const { user_id, is_admin_comment, comment,paper_id } = req.body;
 
-  const query = `INSERT INTO Comments (UserId, content,is_admin_comment) VALUES (?, ?, ?)  `;
+  const query = `INSERT INTO Comments (UserId, content,is_admin_comment,paper_id) VALUES (?, ?, ?,?)  `;
 
-  pool.query(query, [user_id, comment, is_admin_comment], (err, result) => {
+  pool.query(query, [user_id, comment, is_admin_comment,paper_id], (err, result) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
@@ -371,9 +371,9 @@ router.post("/send_comment", (req, res) => {
 router.get("/user_comment", (req, res) => {
   const { user_id,paper_id } = req.query;
 
-  const query = 'SELECT * FROM Comments WHERE paper_id = ? OR UserId = ?';
+  const query = 'SELECT * FROM Comments WHERE paper_id = ?';
   
-  pool.query(query, [paper_id,user_id], (err, results) => {
+  pool.query(query, [paper_id], (err, results) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
