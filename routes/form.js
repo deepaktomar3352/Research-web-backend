@@ -26,7 +26,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
 
   // Insert data into `paper_submission`
   pool.query(
-    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract,category, address_line_one, address_line_two, city, postal_code, submitted_by) VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?)",
     [
       data.paperTitle,
       data.researchArea,
@@ -34,6 +34,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
       uploadedFile.mimetype,
       data.keywords,
       data.abstract,
+      data.category,
       data.addressLine1,
       data.addressLine2,
       data.city,
