@@ -6,7 +6,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
-/*  users Register. */
+/*  viewer Register. */
 router.post(
   "/viewer_register",
   upload.single("userImage"),
@@ -58,7 +58,7 @@ router.post(
   }
 );
 
-/* user login. */
+/* viewer login. */
 router.post("/viewer_login", function (req, res) {
   const { email, password } = req.body;
   console.log("frontend", email, password);
@@ -103,7 +103,7 @@ router.post("/viewer_login", function (req, res) {
           res.status(200).json({
             status: true,
             message: "Login successful",
-            user: {
+            viewer: {
               id:user.id,
               firstname: user.firstname,
               lastname: user.lastname,
@@ -206,10 +206,10 @@ router.post("/reset_password/:token", async (req, res) => {
 });
 
 /* fetching user details */
-router.get("/user_info", function (req, res) {
+router.get("/viewer_info", function (req, res) {
   
   pool.query(
-    "SELECT id, firstname,lastname, userpic FROM user_registration",
+    "SELECT id, firstname,lastname, userpic FROM viewer_registration",
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -223,8 +223,8 @@ router.get("/user_info", function (req, res) {
       // Return the selected data as JSON
       res.status(200).json({
         status: true,
-        message: "User info retrieved successfully",
-        users: results, // The array of results with the selected columns
+        message: "viewer info retrieved successfully",
+        viewer: results, // The array of results with the selected columns
       });
     }
   );
