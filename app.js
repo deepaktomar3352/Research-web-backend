@@ -21,6 +21,7 @@ app.use((req, res, next) => {
 });
 
 var usersRouter = require('./routes/users');
+var viewerRouter = require('./routes/viewer');
 var userForm = require('./routes/form');
 
 // view engine setup
@@ -36,6 +37,7 @@ app.use(cors());
 
 
 app.use('/users', usersRouter);
+app.use('/viewer', viewerRouter);
 app.use('/form', userForm);
 
 // catch 404 and forward to error handler
