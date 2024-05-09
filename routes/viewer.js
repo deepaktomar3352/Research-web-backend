@@ -104,7 +104,7 @@ router.post("/viewer_login", function (req, res) {
             status: true,
             message: "Login successful",
             viewer: {
-              id:user.id,
+              id: user.id,
               firstname: user.firstname,
               lastname: user.lastname,
               email: user.email,
@@ -207,7 +207,6 @@ router.post("/reset_password/:token", async (req, res) => {
 
 /* fetching user details */
 router.get("/viewer_info", function (req, res) {
-  
   pool.query(
     "SELECT id, firstname,lastname, userpic FROM viewer_registration",
     (err, results) => {
@@ -229,5 +228,81 @@ router.get("/viewer_info", function (req, res) {
     }
   );
 });
+
+// sending paper details from admin to viewer
+router.post("/send_paper", (req, res) => {
+  console.log("Request body:", req.body);
+
+  // Extract paper_id from the request body
+  const { paper_id } = req.body;
+
+  // If viewer_id is an array, insert each viewer_id separately
+  if (Array.isArray(req.body.viewer_id)) {
+    req.body.viewer_id.forEach((viewer_id) => {
+      const sql =
+        "INSERT INTO viewer_paper_relationship (viewer_id, paper_id) VALUES (?, ?)";
+      const values = [viewer_id, paper_id];
+
+      pool.query(sql, values, (err, result) => {
+        if (err) {
+          console.error("Error inserting data: ", err);
+          return res.status(500).send("Error inserting data");
+        }
+        console.log("Data inserted successfully for viewer_id:", viewer_id);
+      });
+    });
+    // Respond with success message after all insertions are completed
+    res.status(200).send("Data inserted successfully for all viewer_ids");
+  } else {
+    // If viewer_id is not an array, insert it directly
+    const sql =
+      "INSERT INTO viewer_paper_relationship (viewer_id, paper_id) VALUES (?, ?)";
+    const values = [req.body.viewer_id, paper_id];
+
+    // Execute the query
+    pool.query(sql, values, (err, result) => {
+      if (err) {
+        console.error("Error inserting data: ", err);
+        return res.status(500).send("Error inserting data");
+      }
+      console.log(
+        "Data inserted successfully for viewer_id:",
+        req.body.viewer_id
+      );
+
+      // Respond with success message
+      res.status(200).send("Data inserted successfully");
+    });
+  }
+});
+
+
+// retreiving data for viewer dashboard
+router.get("/viewer_paper_data", (req, res) => {
+  // Extract viewer_id from the request parameters
+  const { viewer_id } = req.query;
+
+  // Define SQL query to select paper data based on viewer_id
+  const sql = `
+    SELECT p.*
+    FROM viewer_paper_relationship AS vpr
+    INNER JOIN paper_submission AS p ON vpr.paper_id = p.id
+    WHERE vpr.viewer_id = ?
+  `;
+  
+  // Execute the query with the viewer_id as a parameter
+  pool.query(sql, [viewer_id], (err, result) => {
+    if (err) {
+      console.error('Error fetching data: ', err);
+      return res.status(500).send('Error fetching data');
+    }
+    
+    // If data is fetched successfully, send the data in the response
+    res.status(200).json(result);
+  });
+});
+
+
+
 
 module.exports = router;
