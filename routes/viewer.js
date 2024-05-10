@@ -5,15 +5,14 @@ var upload = require("./multer");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const { error } = require("console");
 
 /*  users Register. */
 router.post(
-  "/user_register",
-  upload.single("userImage"),
+  "/viewer_register",
+  upload.single("viewerImage"),
   function (req, res, next) {
-    console.log("name", req.body.firstName);
-    console.log("last", req.body.lastName);
+    console.log("name", req.body.firstname);
+    console.log("last", req.body.lastname);
     console.log("body", req.body.receiveUpdates);
 
     // Hash the password
@@ -27,60 +26,46 @@ router.post(
         });
       }
 
+      // Insert user data into the database
       pool.query(
-        "SELECT * FROM user_registration WHERE email = ?",
-        [req.body.email],
+        "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          req.body.firstname,
+          req.body.lastname,
+          req.body.email,
+          hash, // Store hashed password
+          req.body.receiveUpdates,
+          req.file ? req.file.originalname : null,
+        ],
         (error, result) => {
-          if (result.length > 0) {
-            return res.status(220).json({
-              status: 1,
-              message: "User already registered",
-              result,
+          if (error) {
+            console.log("SQL Error:", error);
+            res.status(500).json({
+              status: false,
+              message: "Error during registration",
+              error: error.sqlMessage,
             });
           } else {
-            pool.query(
-              "INSERT INTO user_registration (firstname, lastname, email, password, emailupdates, userpic) VALUES (?, ?, ?, ?, ?, ?)",
-              [
-                req.body.firstName,
-                req.body.lastName,
-                req.body.email,
-                hash, // Store hashed password
-                req.body.receiveUpdates,
-                req.file ? req.file.originalname : null,
-              ],
-              (error, result) => {
-                if (error) {
-                  console.log("SQL Error:", error);
-                  res.status(500).json({
-                    status: false,
-                    message: "server error",
-                    error: error.sqlMessage,
-                  });
-                } else {
-                  res.status(200).json({
-                    status: 2,
-                    message: "Registered Successfully",
-                    result,
-                  });
-                }
-              }
-            );
+            res.status(200).json({
+              status: true,
+              message: "Registered Successfully",
+              result,
+            });
           }
         }
       );
-      // Insert user data into the database
     });
   }
 );
 
 /* user login. */
-router.post("/user_login", function (req, res) {
+router.post("/viewer_login", function (req, res) {
   const { email, password } = req.body;
   console.log("frontend", email, password);
 
   // Query the database for the user with the provided email
   pool.query(
-    "SELECT * FROM user_registration WHERE email = ?",
+    "SELECT * FROM viewer_registration WHERE email = ?",
     [email],
     (err, results) => {
       if (err) {
@@ -100,10 +85,10 @@ router.post("/user_login", function (req, res) {
         });
       }
 
-      const user = results[0];
+      const viewer = results[0];
 
       // Compare the provided password with the stored hashed password
-      bcrypt.compare(password, user.password, (compareErr, isMatch) => {
+      bcrypt.compare(password, viewer.password, (compareErr, isMatch) => {
         if (compareErr) {
           console.error("Error comparing passwords:", compareErr);
           return res.status(500).json({
@@ -118,13 +103,13 @@ router.post("/user_login", function (req, res) {
           res.status(200).json({
             status: true,
             message: "Login successful",
-            user: {
-              id: user.id,
-              firstname: user.firstname,
-              lastname: user.lastname,
-              email: user.email,
-              emailupdates: user.emailupdates,
-              userpic: user.userpic,
+            viewer: {
+              id:viewer.id,
+              firstname: viewer.firstname,
+              lastname: viewer.lastname,
+              email: viewer.email,
+              emailupdates: viewer.emailupdates,
+              userpic: viewer.userpic,
             },
           });
         } else {
@@ -160,7 +145,7 @@ router.post("/forgot_password", async (req, res) => {
 
   // Store the reset token and expiration in the database
   await pool.query(
-    "UPDATE user_registration SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
+    "UPDATE viewer_registration SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
     [resetToken, resetTokenExpires, email]
   );
 
@@ -210,7 +195,7 @@ router.post("/reset_password/:token", async (req, res) => {
   const hash = await bcrypt.hash(password, 10); // Hash the new password
 
   await pool.query(
-    "UPDATE user_registration SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE reset_token = ?",
+    "UPDATE viewer_registration SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE reset_token = ?",
     [hash, token]
   );
 
@@ -221,9 +206,10 @@ router.post("/reset_password/:token", async (req, res) => {
 });
 
 /* fetching user details */
-router.get("/user_info", function (req, res) {
+router.get("/viewer_info", function (req, res) {
+  
   pool.query(
-    "SELECT id, firstname,lastname, userpic FROM user_registration",
+    "SELECT id, firstname,lastname, userpic FROM viewer_registration",
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
