@@ -302,7 +302,164 @@ router.get("/viewer_paper_data", (req, res) => {
   });
 });
 
+// save comments in table
+router.post("/send_comment", (req, res) => {
+  console.log("Body:", req.body);
 
+  const { viewer_id: viewer_id, is_admin_comment, comment, paper_id } = req.body;
+
+  const query = `INSERT INTO viewer_comments (viewer_id, content,is_admin_comment,paper_id) VALUES (?, ?, ?,?)  `;
+
+  pool.query(
+    query,
+    [viewer_id, comment, is_admin_comment, paper_id],
+    (err, result) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error submitting comment",
+          error: err.sqlMessage || err.message,
+        });
+      }
+
+      res.status(200).json({
+        status: true,
+        message: "Comment submitted successfully",
+        data: result,
+      });
+    }
+  );
+});
+
+//fetching user comments
+router.get("/viewer_comment", (req, res) => {
+  const { viewer_id, paper_id } = req.query;
+
+  let query;
+  let queryParams;
+
+  if (paper_id) {
+    // If paper_id is provided, fetch comments by paper_id
+    query = "SELECT * FROM viewer_comments WHERE paper_id = ?";
+    queryParams = [paper_id];
+  } else if (viewer_id) {
+    // If paper_id is not provided, fetch all comments by user_id
+    query = "SELECT * FROM viewer_comments WHERE viewer_id = ?";
+    queryParams = [viewer_id];
+  }
+
+  pool.query(query, queryParams, (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Error retrieving comments",
+        error: err.sqlMessage || err.message,
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      message: "Comments retrieved successfully",
+      data: results,
+    });
+  });
+});
+
+// Endpoint to get the count of new comments for a given paper since the last seen timestamp
+router.get("/new_count", (req, res) => {
+  const query =
+    "SELECT paper_id, COUNT(*) as count FROM viewer_comments WHERE is_admin_comment = 1 AND status = 0 GROUP BY paper_id";
+
+  pool.query(query, (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Error retrieving new admin comments",
+        error: err.sqlMessage || err.message,
+      });
+    }
+
+    res.status(200).json({ counts: results });
+  });
+});
+
+router.post("/reset_count", (req, res) => {
+  const { paperid } = req.body;
+  console.log("resetid", paperid);
+  // Update the status for the given paper_id
+  const query = "UPDATE viewer_comments SET status = 1 WHERE paper_id = ?";
+  const queryParams = [paperid];
+
+  pool.query(query, queryParams, (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Error updating comment status",
+        error: err.sqlMessage || err.message,
+      });
+    }
+
+    res.status(200).json({ message: "Comment status updated successfully" });
+  });
+});
+
+//fetching admin comments
+router.get("/admin_comment", (req, res) => {
+  const { paper_id } = req.query;
+
+  const query = "SELECT * FROM Comments WHERE paper_id = ?";
+
+  pool.query(query, [paper_id], (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Error retrieving comments",
+        error: err.sqlMessage || err.message,
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      message: "Comments retrieved successfully",
+      data: results,
+    });
+  });
+});
+
+// admin sending comments
+router.post("/send_admin_comment", (req, res) => {
+  console.log("Body:", req.body);
+
+  const { user_id, is_admin_comment, comment, paper_id } = req.body;
+
+  const query = `INSERT INTO Comments (UserId, content,is_admin_comment,target_user_id,paper_id,status) VALUES (?, ?, ?,?,?,0)  `;
+
+  pool.query(
+    query,
+    [user_id, comment, is_admin_comment, user_id, paper_id],
+    (err, result) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error submitting comment",
+          error: err.sqlMessage || err.message,
+        });
+      }
+
+      res.status(200).json({
+        status: true,
+        message: "Comment submitted successfully",
+        data: result,
+      });
+    }
+  );
+});
 
 
 module.exports = router;
