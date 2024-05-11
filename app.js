@@ -21,6 +21,7 @@ app.use((req, res, next) => {
 });
 
 var usersRouter = require('./routes/users');
+var viewerRouter = require('./routes/viewer');
 var userForm = require('./routes/form');
 var viewerRouter = require('./routes/viewer');
 
@@ -38,6 +39,7 @@ app.use(cors());
 
 
 app.use('/users', usersRouter);
+app.use('/viewer', viewerRouter);
 app.use('/form', userForm);
 app.use('/viewer', viewerRouter);
 
