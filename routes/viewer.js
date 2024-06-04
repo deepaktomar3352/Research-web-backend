@@ -334,20 +334,16 @@ router.post("/send_comment", (req, res) => {
 
 //fetching user comments
 router.get("/viewer_comment", (req, res) => {
-  const { viewer_id, paper_id } = req.query;
+  const { viewer_id} = req.query;
 
   let query;
   let queryParams;
 
-  if (paper_id) {
+  if (viewer_id) {
     // If paper_id is provided, fetch comments by paper_id
-    query = "SELECT * FROM viewer_comments WHERE paper_id = ?";
-    queryParams = [paper_id];
-  } else if (viewer_id) {
-    // If paper_id is not provided, fetch all comments by user_id
-    query = "SELECT * FROM viewer_comments WHERE viewer_id = ?";
-    queryParams = [viewer_id];
-  }
+    query = "SELECT * FROM viewer_comments WHERE target_viewer_id = ? || viewer_id = ?";
+    queryParams = [viewer_id,viewer_id];
+  } 
 
   pool.query(query, queryParams, (err, results) => {
     if (err) {
@@ -408,12 +404,13 @@ router.post("/reset_count", (req, res) => {
 });
 
 //fetching admin comments
+
 router.get("/admin_comment", (req, res) => {
-  const { paper_id } = req.query;
+  const { viewer_id } = req.query;
 
-  const query = "SELECT * FROM Comments WHERE paper_id = ?";
+  const query = "SELECT * FROM viewer_comments WHERE viewer_id = ? ";
 
-  pool.query(query, [paper_id], (err, results) => {
+  pool.query(query, [viewer_id], (err, results) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
@@ -431,17 +428,14 @@ router.get("/admin_comment", (req, res) => {
   });
 });
 
-// admin sending comments
 router.post("/send_admin_comment", (req, res) => {
-  console.log("Body:", req.body);
+  const { viewer_id, is_admin_comment, comment } = req.body;
 
-  const { user_id, is_admin_comment, comment, paper_id } = req.body;
-
-  const query = `INSERT INTO Comments (UserId, content,is_admin_comment,target_user_id,paper_id,status) VALUES (?, ?, ?,?,?,0)  `;
+  const query = `INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, target_viewer_id, status) VALUES (?, ?, ?, ?, 0)`;
 
   pool.query(
     query,
-    [user_id, comment, is_admin_comment, user_id, paper_id],
+    [viewer_id, comment, is_admin_comment, viewer_id],
     (err, result) => {
       if (err) {
         console.error("Database error:", err);
@@ -460,6 +454,8 @@ router.post("/send_admin_comment", (req, res) => {
     }
   );
 });
+``
+
 
 
 module.exports = router;
