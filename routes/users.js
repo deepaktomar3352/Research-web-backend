@@ -104,7 +104,7 @@ router.post("/user_login", function (req, res) {
             status: true,
             message: "Login successful",
             user: {
-              id:user.id,
+              id: user.id,
               firstname: user.firstname,
               lastname: user.lastname,
               email: user.email,
@@ -125,89 +125,147 @@ router.post("/user_login", function (req, res) {
 });
 
 /* forgot password*/
-router.post("/forgot_password", async (req, res) => {
+router.post("/forgot_password", function (req, res, next) {
   const { email } = req.body;
 
-  const user = await pool.query(
+  pool.query(
     "SELECT * FROM user_registration WHERE email = ?",
-    [email]
+    [email],
+    async (error, results) => {
+      if (error) {
+        console.error("SQL Error:", error);
+        return res.status(500).json({
+          status: false,
+          message: "Error during forgot password",
+          error: error.sqlMessage,
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: "User not found",
+        });
+      }
+
+      const resetToken = crypto.randomBytes(20).toString("hex"); // Generate token
+      const resetTokenExpiry = new Date(Date.now() + 1800000); // Token expiry set to 30 minutes from now
+
+      pool.query(
+        "UPDATE user_registration SET reset_token = ?, reset_token_expiry = ? WHERE email = ?",
+        [resetToken, resetTokenExpiry, email],
+        async (updateError) => {
+          if (updateError) {
+            console.error("SQL Error:", updateError);
+            return res.status(500).json({
+              status: false,
+              message: "Error during forgot password",
+              error: updateError.sqlMessage,
+            });
+          }
+
+          const resetLink = `http://localhost:3000/UserResetPassword/${resetToken}`; // Link to reset password
+
+          // Set up email transport and send reset email
+          const transporter = nodemailer.createTransport({
+            service: "Gmail",
+            auth: {
+              user: "deepaktomarcse2020@gmail.com",
+              pass: "obwn bgma kcua vgck",
+            },
+          });
+
+          const mailOptions = {
+            to: email,
+            from: "deepaktomarcse2020@gmail.com",
+            subject: "Research Paper Password Reset",
+            text: `Click the link to reset your password: ${resetLink}`,
+          };
+
+          try {
+            await transporter.sendMail(mailOptions);
+            res.status(200).json({
+              status: true,
+              message: "Password reset email sent",
+            });
+          } catch (emailError) {
+            console.error("Email Error:", emailError);
+            res.status(500).json({
+              status: false,
+              message: "Error sending reset email",
+              error: emailError.message,
+            });
+          }
+        }
+      );
+    }
   );
-
-  if (user.length === 0) {
-    return res.status(404).json({
-      status: false,
-      message: "User not found",
-    });
-  }
-
-  const resetToken = crypto.randomBytes(20).toString("hex"); // Generate token
-  const resetTokenExpires = Date.now() + 300000; // Token expires in 5 minutes
-
-  // Store the reset token and expiration in the database
-  await pool.query(
-    "UPDATE user_registration SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
-    [resetToken, resetTokenExpires, email]
-  );
-
-  const resetLink = `http://localhost:3000/UserResetPassword/${resetToken}`; // Link to reset password
-
-  // Set up email transport and send reset email
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: "deepaktomarcse2020@gmail.com",
-      pass: "obwn bgma kcua vgck",
-    },
-  });
-
-  const mailOptions = {
-    to: email,
-    from: "deepaktomarcse2020@gmail.com",
-    subject: "Research Paper Password Reset",
-    text: `Click the link to reset your password: ${resetLink}`,
-  };
-
-  await transporter.sendMail(mailOptions);
-
-  res.status(200).json({
-    status: true,
-    message: "Password reset email sent",
-  });
 });
 
+
 /* reset password */
-router.post("/reset_password/:token", async (req, res) => {
+router.post("/reset_password/:token", function (req, res, next) {
   const { token } = req.params;
   const { password } = req.body;
 
-  const user = await pool.query(
-    "SELECT * FROM user_registration WHERE reset_token = ? AND reset_token_expires > ?",
-    [token, Date.now()]
+  pool.query(
+    "SELECT * FROM user_registration WHERE reset_token = ? AND reset_token_expiry > NOW()",
+    [token],
+    async (error, results) => {
+      if (error) {
+        console.error("SQL Error:", error);
+        return res.status(500).json({
+          status: false,
+          message: "Error during reset password",
+          error: error.sqlMessage,
+        });
+      }
+
+      if (results.length === 0) {
+        return res.status(400).json({
+          status: false,
+          message: "Invalid or expired token",
+        });
+      }
+
+      bcrypt.hash(password, 10, function (err, hash) {
+        if (err) {
+          console.error("Error hashing password:", err);
+          return res.status(500).json({
+            status: false,
+            message: "Error during password reset",
+            error: err.message,
+          });
+        }
+
+        pool.query(
+          "UPDATE user_registration SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?",
+          [hash, token],
+          (updateError, result) => {
+            if (updateError) {
+              console.error("SQL Error:", updateError);
+              return res.status(500).json({
+                status: false,
+                message: "Error during password reset",
+                error: updateError.sqlMessage,
+              });
+            }
+
+            res.status(200).json({
+              status: true,
+              message: "Password reset successful",
+            });
+          }
+        );
+      });
+    }
   );
-
-  if (user.length === 0) {
-    return res.status(400).json({
-      status: false,
-      message: "Invalid or expired token",
-    });
-  }
-
-  const hash = await bcrypt.hash(password, 10); // Hash the new password
-
-  await pool.query(
-    "UPDATE user_registration SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE reset_token = ?",
-    [hash, token]
-  );
-
-  res.status(200).json({
-    status: true,
-    message: "Password reset successful",
-  });
 });
+
+
 
 /* fetching user details */
 router.get("/user_info", function (req, res) {
-  
   pool.query(
     "SELECT id, firstname,lastname, userpic FROM user_registration",
     (err, results) => {
