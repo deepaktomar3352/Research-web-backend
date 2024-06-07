@@ -7,10 +7,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 /*  viewer Register. */
-router.post(
-  "/viewer_register",
-  upload.single("userImage"),
-  function (req, res, next) {
+router.post("/viewer_register",upload.single("userImage"),function (req, res, next) {
     console.log("name", req.body.firstname);
     console.log("last", req.body.lastname);
     console.log("body", req.body.receiveUpdates);
@@ -28,7 +25,7 @@ router.post(
 
       // Insert user data into the database
       pool.query(
-        "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic,category) VALUES (?, ?, ?, ?, ?, ?,?)",
         [
           req.body.firstname,
           req.body.lastname,
@@ -36,6 +33,7 @@ router.post(
           hash, // Store hashed password
           req.body.receiveUpdates,
           req.file ? req.file.originalname : null,
+          req.body.category
         ],
         (error, result) => {
           if (error) {
