@@ -193,9 +193,10 @@ router.post("/forgot_password", async (req, res) => {
 /* reset password */
 router.post("/reset_password/:token", async (req, res) => {
   const { token } = req.params;
-  const { password } = req.body;
+  const  password  = req.body.password;
+  console.log("password",password)
 
-  const user = await pool.query(
+  const user= await pool.query(
     "SELECT * FROM user_registration WHERE reset_token = ? AND reset_token_expires > ?",
     [token, Date.now()]
   );

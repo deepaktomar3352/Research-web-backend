@@ -11,6 +11,8 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
   const data = req.body; // Form data
   const uploadedFile = req.file; // Uploaded file data
   let authors = [];
+  console.log("paper data",data)
+  console.log("file",uploadedFile)
 
   // Try to parse the authors' data
   try {
@@ -43,6 +45,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
     ],
     (error, result) => {
       if (error) {
+        console.error("Database error:", error);
         res.status(500).json({
           status: false,
           message: "Error during paper submission",
