@@ -115,12 +115,13 @@ router.get("/paper_requests", function (req, res) {
       ps.research_area,
       ps.paper_uploaded,
       ps.mimetype,
+      ps.category,
       ps.submission_date,
       u.id AS user_id,
       u.firstname,
       u.lastname,
       u.userpic
-    FROM 
+        FROM 
       paper_submission ps
     JOIN 
       user_registration u

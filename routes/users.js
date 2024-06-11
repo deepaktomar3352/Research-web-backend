@@ -153,7 +153,7 @@ router.post("/forgot_password", function (req, res, next) {
           status: false,
           message: "Error during forgot password",
           error: error.sqlMessage,
-        });
+        })
       }
 
       if (results.length === 0) {

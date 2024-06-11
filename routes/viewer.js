@@ -7,7 +7,10 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 /*  viewer Register. */
-router.post("/viewer_register",upload.single("userImage"),function (req, res, next) {
+router.post(
+  "/viewer_register",
+  upload.single("userImage"),
+  function (req, res, next) {
     console.log("name", req.body.firstname);
     console.log("last", req.body.lastname);
     console.log("body", req.body.receiveUpdates);
@@ -33,7 +36,7 @@ router.post("/viewer_register",upload.single("userImage"),function (req, res, ne
           hash, // Store hashed password
           req.body.receiveUpdates,
           req.file ? req.file.originalname : null,
-          req.body.category
+          req.body.category,
         ],
         (error, result) => {
           if (error) {
@@ -205,8 +208,13 @@ router.post("/reset_password/:token", async (req, res) => {
 
 /* fetching user details */
 router.get("/viewer_info", function (req, res) {
+  const category = req.query.category;
+
+  console.log("Category:", category);
+
   pool.query(
-    "SELECT id, firstname,lastname, userpic FROM viewer_registration",
+    "SELECT id, firstname, lastname, userpic FROM viewer_registration WHERE category = ?",
+    [category],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -220,9 +228,95 @@ router.get("/viewer_info", function (req, res) {
       // Return the selected data as JSON
       res.status(200).json({
         status: true,
-        message: "viewer info retrieved successfully",
+        message: "Viewer info retrieved successfully",
         viewer: results, // The array of results with the selected columns
       });
+    }
+  );
+});
+
+router.post("/viewer_info2", function (req, res) {
+  const paperId = req.body.paperId; // Access paperId from request body
+
+  console.log("Paper ID:", paperId);
+
+  // Modify the query to join the necessary tables and fetch viewer and paper info
+  pool.query(
+    `SELECT 
+       vr.id AS viewer_id, 
+       vr.firstname, 
+       vr.lastname, 
+       vr.userpic,
+       p.paper_id,
+       p.sharedat,
+       p.sharedby 
+     FROM 
+       viewer_registration vr
+     JOIN 
+       sharedpaper_viewers p ON vr.id = p.viewers_id
+     WHERE 
+       p.paper_id = ?`,
+    [paperId],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving user info",
+          error: err.sqlMessage,
+        });
+      }
+      console.log("result shared table ", results);
+      // Return the selected data as JSON
+      res.status(200).json({
+        status: true,
+        message: "Viewer and paper info retrieved successfully",
+        data: results, // The array of results with the selected columns
+      });
+    }
+  );
+});
+
+router.post("/sharedPaper_viewers", (req, res) => {
+  const { paper_id, viewer_id, sharedat, sharedby } = req.body;
+
+  // Validate the input data
+  if (
+    !paper_id ||
+    !Array.isArray(viewer_id) ||
+    viewer_id.length === 0 ||
+    !sharedat ||
+    !sharedby
+  ) {
+    return res.status(400).json({
+      status: false,
+      message:
+        "All fields are required and viewer_id must be a non-empty array",
+    });
+  }
+
+  // Convert the viewer_id array to a comma-separated string
+  const viewers_id_str = viewer_id.join(",");
+
+  // Insert into the database
+  pool.query(
+    "INSERT INTO sharedpaper_viewers(paper_id, viewers_id, sharedat, sharedby) VALUES (?, ?, ?, ?)",
+    [paper_id, viewers_id_str, sharedat, sharedby],
+    (error, result) => {
+      if (error) {
+        console.error("SQL Error:", error);
+        return res.status(500).json({
+          status: false,
+          message: "Error during registration",
+          error: error.sqlMessage,
+        });
+      } else {
+        return res.status(200).json({
+          status: true,
+          message: "shared viewers saved succesfully",
+          result: result,
+        });
+      }
     }
   );
 });
@@ -274,7 +368,6 @@ router.post("/send_paper", (req, res) => {
   }
 });
 
-
 // retreiving data for viewer dashboard
 router.get("/viewer_paper_data", (req, res) => {
   // Extract viewer_id from the request parameters
@@ -287,14 +380,14 @@ router.get("/viewer_paper_data", (req, res) => {
     INNER JOIN paper_submission AS p ON vpr.paper_id = p.id
     WHERE vpr.viewer_id = ?
   `;
-  
+
   // Execute the query with the viewer_id as a parameter
   pool.query(sql, [viewer_id], (err, result) => {
     if (err) {
-      console.error('Error fetching data: ', err);
-      return res.status(500).send('Error fetching data');
+      console.error("Error fetching data: ", err);
+      return res.status(500).send("Error fetching data");
     }
-    
+
     // If data is fetched successfully, send the data in the response
     res.status(200).json(result);
   });
@@ -304,7 +397,12 @@ router.get("/viewer_paper_data", (req, res) => {
 router.post("/send_comment", (req, res) => {
   console.log("Body:", req.body);
 
-  const { viewer_id: viewer_id, is_admin_comment, comment, paper_id } = req.body;
+  const {
+    viewer_id: viewer_id,
+    is_admin_comment,
+    comment,
+    paper_id,
+  } = req.body;
 
   const query = `INSERT INTO viewer_comments (viewer_id, content,is_admin_comment,paper_id) VALUES (?, ?, ?,?)  `;
 
@@ -332,16 +430,17 @@ router.post("/send_comment", (req, res) => {
 
 //fetching user comments
 router.get("/viewer_comment", (req, res) => {
-  const { viewer_id} = req.query;
+  const { viewer_id } = req.query;
 
   let query;
   let queryParams;
 
   if (viewer_id) {
     // If paper_id is provided, fetch comments by paper_id
-    query = "SELECT * FROM viewer_comments WHERE target_viewer_id = ? || viewer_id = ?";
-    queryParams = [viewer_id,viewer_id];
-  } 
+    query =
+      "SELECT * FROM viewer_comments WHERE target_viewer_id = ? || viewer_id = ?";
+    queryParams = [viewer_id, viewer_id];
+  }
 
   pool.query(query, queryParams, (err, results) => {
     if (err) {
@@ -428,6 +527,7 @@ router.get("/admin_comment", (req, res) => {
 
 router.post("/send_admin_comment", (req, res) => {
   const { viewer_id, is_admin_comment, comment } = req.body;
+  console.log("body messages",req.body)
 
   const query = `INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, target_viewer_id, status) VALUES (?, ?, ?, ?, 0)`;
 
@@ -452,8 +552,6 @@ router.post("/send_admin_comment", (req, res) => {
     }
   );
 });
-``
-
-
+``;
 
 module.exports = router;
