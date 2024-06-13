@@ -206,7 +206,95 @@ router.post("/reset_password/:token", async (req, res) => {
   });
 });
 
-/* fetching user details */
+/* fetching Viewers details */
+router.get("/fetchViewers", function (req, res) {
+  pool.query("SELECT * FROM viewer_registration", (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Error retrieving user info",
+        error: err.sqlMessage,
+      });
+    }
+    res.status(200).json({
+      status: true,
+      message: "Viewers data fetched successfully",
+      data: results,
+    });
+  });
+});
+router.post("/viewerData_update", function (req, res) {
+  const { id, updatedData } = req.body;
+
+  if (!updatedData) {
+    return res.status(400).json({
+      status: false,
+      message: "No data provided for update",
+    });
+  }
+  const { firstname, lastname, email, category, userpic } = updatedData;
+
+  if (!firstname || !lastname || !email || !category || !userpic) {
+    return res.status(400).json({
+      status: false,
+      message: "Incomplete data provided for update",
+    });
+  }
+
+  pool.query(
+    "UPDATE viewer_registration SET firstname = ?, lastname = ?, email = ?, category = ?, userpic = ? WHERE id = ?",
+    [firstname, lastname, email, category, userpic, id],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error updating user info",
+          error: err.sqlMessage,
+        });
+      }
+      res.status(200).json({
+        status: true,
+        message: "User info updated successfully",
+        data: results,
+      });
+    }
+  );
+});
+
+router.post('/deleteViewer_Data', function (req, res) {
+  const id  = req.body.id;
+  console.log("id",id)
+
+  if (!id) {
+    return res.status(400).json({
+      status: false,
+      message: "No ID provided for deletion",
+    });
+  }
+
+  pool.query(
+    "DELETE FROM viewer_registration WHERE id = ?",
+    [id],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error deleting viewer",
+          error: err.sqlMessage,
+        });
+      }
+      res.status(200).json({
+        status: true,
+        message: "Viewer deleted successfully",
+        data: results,
+      });
+    }
+  );
+});
+
 router.get("/viewer_info", function (req, res) {
   const category = req.query.category;
 
@@ -234,53 +322,77 @@ router.get("/viewer_info", function (req, res) {
     }
   );
 });
-
-router.post("/viewer_info2", function (req, res) {
+// fetch viewers details from sharedviewers table 
+router.post("/selectedviewer_info", function (req, res) {
   const paperId = req.body.paperId; // Access paperId from request body
 
   console.log("Paper ID:", paperId);
 
-  // Modify the query to join the necessary tables and fetch viewer and paper info
   pool.query(
     `SELECT 
-       vr.id AS viewer_id, 
-       vr.firstname, 
-       vr.lastname, 
-       vr.userpic,
-       p.paper_id,
-       p.sharedat,
-       p.sharedby 
+       viewers_id
      FROM 
-       viewer_registration vr
-     JOIN 
-       sharedpaper_viewers p ON vr.id = p.viewers_id
+       sharedpaper_viewers 
      WHERE 
-       p.paper_id = ?`,
+       paper_id = ?`,
     [paperId],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
         return res.status(500).json({
           status: false,
-          message: "Error retrieving user info",
+          message: "Error retrieving shared paper info",
           error: err.sqlMessage,
         });
       }
-      console.log("result shared table ", results);
-      // Return the selected data as JSON
-      res.status(200).json({
-        status: true,
-        message: "Viewer and paper info retrieved successfully",
-        data: results, // The array of results with the selected columns
-      });
+
+      if (results.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: "No viewers found for this paper",
+        });
+      }
+
+      const viewersIdString = results[0].viewers_id;
+      const viewersIds = viewersIdString
+        .split(",")
+        .map((id) => parseInt(id, 10));
+
+      pool.query(
+        `SELECT 
+           id AS viewer_id, 
+           firstname, 
+           lastname, 
+           userpic
+         FROM 
+           viewer_registration 
+         WHERE 
+           id IN (?)`,
+        [viewersIds],
+        (err, viewerResults) => {
+          if (err) {
+            console.error("Database error:", err);
+            return res.status(500).json({
+              status: false,
+              message: "Error retrieving viewer info",
+              error: err.sqlMessage,
+            });
+          }
+
+          res.status(200).json({
+            status: true,
+            message: "Viewer info retrieved successfully",
+            data: viewerResults, // The array of viewer results with the selected columns
+          });
+        }
+      );
     }
   );
 });
-
+// insert viewers and paper id in sharedviewers table 
 router.post("/sharedPaper_viewers", (req, res) => {
   const { paper_id, viewer_id, sharedat, sharedby } = req.body;
 
-  // Validate the input data
   if (
     !paper_id ||
     !Array.isArray(viewer_id) ||
@@ -298,9 +410,13 @@ router.post("/sharedPaper_viewers", (req, res) => {
   // Convert the viewer_id array to a comma-separated string
   const viewers_id_str = viewer_id.join(",");
 
-  // Insert into the database
+  // Insert or update the database
   pool.query(
-    "INSERT INTO sharedpaper_viewers(paper_id, viewers_id, sharedat, sharedby) VALUES (?, ?, ?, ?)",
+    `INSERT INTO sharedpaper_viewers (paper_id, viewers_id, sharedat, sharedby)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+     viewers_id = VALUES(viewers_id),
+     sharedat = VALUES(sharedat), sharedby = VALUES(sharedby)`,
     [paper_id, viewers_id_str, sharedat, sharedby],
     (error, result) => {
       if (error) {
@@ -313,7 +429,7 @@ router.post("/sharedPaper_viewers", (req, res) => {
       } else {
         return res.status(200).json({
           status: true,
-          message: "shared viewers saved succesfully",
+          message: "Shared viewers saved successfully",
           result: result,
         });
       }
@@ -370,10 +486,6 @@ router.post("/send_paper", (req, res) => {
 
 // retreiving data for viewer dashboard
 router.get("/viewer_paper_data", (req, res) => {
-  // Extract viewer_id from the request parameters
-  const { viewer_id } = req.query;
-
-  // Define SQL query to select paper data based on viewer_id
   const sql = `
     SELECT p.*
     FROM viewer_paper_relationship AS vpr
@@ -391,6 +503,60 @@ router.get("/viewer_paper_data", (req, res) => {
     // If data is fetched successfully, send the data in the response
     res.status(200).json(result);
   });
+});
+
+router.get("/shared_paper_details", (req, res) => {
+  pool.query(
+    `SELECT DISTINCT paper_id FROM sharedpaper_viewers`,
+    (err, sharedResults) => {
+      if (err) {
+        console.error("SQL Error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving paper IDs",
+          error: err.sqlMessage,
+        });
+      }
+
+      if (sharedResults.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: "No shared papers found",
+        });
+      }
+
+      // Extract paper_ids from the sharedResults
+      const paperIds = sharedResults.map((row) => row.paper_id);
+
+      // Now, get paper details from the papersubmission table based on the paper_ids
+      pool.query(
+        `SELECT 
+         id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status
+         FROM 
+           paper_submission 
+         WHERE 
+          id IN (?)`,
+        [paperIds],
+        (error, paperResults) => {
+          if (error) {
+            console.error("SQL Error:", error);
+            return res.status(500).json({
+              status: false,
+              message: "Error retrieving paper details",
+              error: error.sqlMessage,
+            });
+          }
+
+          return res.status(200).json({
+            status: true,
+            message: "Paper details retrieved successfully",
+            data: paperResults,
+          });
+          console.log("shared_paper_details", paperResults);
+        }
+      );
+    }
+  );
 });
 
 // save comments in table
@@ -527,7 +693,7 @@ router.get("/admin_comment", (req, res) => {
 
 router.post("/send_admin_comment", (req, res) => {
   const { viewer_id, is_admin_comment, comment } = req.body;
-  console.log("body messages",req.body)
+  console.log("body messages", req.body);
 
   const query = `INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, target_viewer_id, status) VALUES (?, ?, ?, ?, 0)`;
 
