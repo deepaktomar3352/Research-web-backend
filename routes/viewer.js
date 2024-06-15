@@ -505,9 +505,21 @@ router.get("/viewer_paper_data", (req, res) => {
   });
 });
 
-router.get("/shared_paper_details", (req, res) => {
+router.post("/shared_paper_details", (req, res) => {
+  const viewer_id = req.body.viewers_id;
+  console.log("viewers id", viewer_id);
+
+  if (!viewer_id) {
+    return res.status(400).json({
+      status: false,
+      message: "viewers_id is required",
+    });
+  }
+
+  // First query to get the distinct paper_ids based on viewer_id
   pool.query(
-    `SELECT DISTINCT paper_id FROM sharedpaper_viewers`,
+    `SELECT DISTINCT paper_id FROM sharedpaper_viewers WHERE FIND_IN_SET(?, viewers_id) > 0`,
+    [viewer_id],
     (err, sharedResults) => {
       if (err) {
         console.error("SQL Error:", err);
@@ -521,19 +533,18 @@ router.get("/shared_paper_details", (req, res) => {
       if (sharedResults.length === 0) {
         return res.status(404).json({
           status: false,
-          message: "No shared papers found",
+          message: "No shared papers found for the provided viewer_id",
         });
       }
 
-      // Extract paper_ids from the sharedResults
       const paperIds = sharedResults.map((row) => row.paper_id);
 
-      // Now, get paper details from the papersubmission table based on the paper_ids
+      // Second query to get paper details from the papersubmission table based on the paper_ids
       pool.query(
         `SELECT 
-         id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status
+          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status
          FROM 
-           paper_submission 
+          paper_submission 
          WHERE 
           id IN (?)`,
         [paperIds],
@@ -552,12 +563,12 @@ router.get("/shared_paper_details", (req, res) => {
             message: "Paper details retrieved successfully",
             data: paperResults,
           });
-          console.log("shared_paper_details", paperResults);
         }
       );
     }
   );
 });
+
 
 // save comments in table
 router.post("/send_comment", (req, res) => {
