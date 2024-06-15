@@ -279,7 +279,6 @@ router.post("/reset_password/:token", function (req, res, next) {
 });
 
 
-
 /* fetching user details */
 router.get("/user_info", function (req, res) {
   pool.query(
@@ -303,5 +302,93 @@ router.get("/user_info", function (req, res) {
     }
   );
 });
+
+/* fetch user profile */
+router.post("/fetch_user_profile", function (req, res) {
+  pool.query(
+    "SELECT id, firstname,lastname,email, userpic FROM user_registration WHERE id =?",[req.body.id],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving user info",
+          error: err.sqlMessage,
+        });
+      }
+
+      // Return the selected data as JSON
+      res.status(200).json({
+        status: true,
+        message: "User info retrieved successfully",
+        data: results, // The array of results with the selected columns
+      });
+    }
+  );
+});
+
+
+/* user profile updation */
+router.post("/user_profile_update", upload.single('userpic'), (req, res) => {
+  const { id, firstName, lastName, email } = req.body;
+  const userpic = req.file ? req.file.filename : null;
+
+  console.log("Updating user profile with ID:", id);
+  console.log("Received values:", { id, firstName, lastName, email, userpic });
+
+  if (!id) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  const updateFields = [];
+  const updateValues = [];
+
+  if (firstName) {
+    updateFields.push("firstname = ?");
+    updateValues.push(firstName);
+  }
+
+  if (lastName) {
+    updateFields.push("lastname = ?");
+    updateValues.push(lastName);
+  }
+
+  if (email) {
+    updateFields.push("email = ?");
+    updateValues.push(email);
+  }
+
+  if (userpic) {
+    updateFields.push("userpic = ?");
+    updateValues.push(userpic);
+  }
+
+  updateValues.push(id);
+
+  if (updateFields.length === 0) {
+    return res.status(400).json({ message: "No fields to update" });
+  }
+
+  const query = `UPDATE user_registration SET ${updateFields.join(', ')} WHERE id = ?`;
+
+  console.log("Executing query:", query);
+  console.log("With values:", updateValues);
+
+  pool.query(query, updateValues, (err, result) => {
+    if (err) {
+      console.error("Error updating user profile:", err);
+      return res.status(500).json({ message: "Error updating user profile" });
+    }
+
+    console.log("Query result:", result);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "User profile updated successfully" });
+  });
+});
+
+
 
 module.exports = router;
