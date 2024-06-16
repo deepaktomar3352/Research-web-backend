@@ -508,6 +508,8 @@ router.get("/viewer_paper_data", (req, res) => {
 router.post("/remove_viewer_id_from_sharedviewer_table", (req, res) => {
   const viewer_id = req.body.viewers_id;
   const paper_id = req.body.paper_id;
+  console.log("viewer id",viewer_id)
+  console.log("paper id",paper_id)
 
   if (!viewer_id || !paper_id) {
     return res.status(400).json({
@@ -659,7 +661,6 @@ router.post("/shared_paper_details", (req, res) => {
 
 // save comments in table
 router.post("/send_comment", (req, res) => {
-
   const {
     viewer_id: viewer_id,
     is_admin_comment,
@@ -693,17 +694,17 @@ router.post("/send_comment", (req, res) => {
 
 //fetching user comments
 router.post("/viewer_comment", (req, res) => {
-  const viewer_id  = req.body.viewer_id;
-  const paper_id=req.body.paper_id
+  const viewer_id = req.body.viewer_id;
+  const paper_id = req.body.paper_id;
 
   let query;
   let queryParams;
 
-  if (viewer_id) {
+  if (viewer_id && paper_id) {
     // If paper_id is provided, fetch comments by paper_id
     query =
-      "SELECT * FROM viewer_comments WHERE target_viewer_id = ? || viewer_id = ? AND paper_id";
-    queryParams = [viewer_id, viewer_id,paper_id];
+      "SELECT * FROM viewer_comments WHERE (target_viewer_id = ? OR viewer_id = ?) AND paper_id = ?";
+    queryParams = [viewer_id, viewer_id, paper_id];
   }
 
   pool.query(query, queryParams, (err, results) => {
@@ -769,7 +770,7 @@ router.post("/reset_count", (req, res) => {
 router.post("/admin_comment", (req, res) => {
   const viewer_id = req.body.viewer_id;
   const paper_id = req.body.paper_id;
- 
+
   // Validate input
   if (!viewer_id || !paper_id) {
     return res.status(400).json({
@@ -778,7 +779,8 @@ router.post("/admin_comment", (req, res) => {
     });
   }
 
-  const query = "SELECT * FROM viewer_comments WHERE viewer_id = ? AND paper_id = ?";
+  const query =
+    "SELECT * FROM viewer_comments WHERE viewer_id = ? AND paper_id = ?";
 
   pool.query(query, [viewer_id, paper_id], (err, results) => {
     if (err) {
@@ -797,7 +799,6 @@ router.post("/admin_comment", (req, res) => {
     });
   });
 });
-
 
 router.post("/send_admin_comment", (req, res) => {
   const { viewer_id, is_admin_comment, comment, paper_id } = req.body;
