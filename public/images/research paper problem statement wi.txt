@@ -1,0 +1,7 @@
+research paper problem statement with solution
+
+1. Data ko delete karne se bachana hai admin or viewer ki side se?
+ans. Data ko duplicate kiya jayega jab admin paper accept kar lega.
+
+2. Status information dena hai user ko uske paper ke liye
+ans. Status ka information user ko admin se milega and admin ko viewer se.

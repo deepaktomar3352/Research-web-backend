@@ -11,24 +11,23 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
   const data = req.body; // Form data
   const uploadedFile = req.file; // Uploaded file data
   let authors = [];
-  console.log("paper data",data)
-  console.log("file",uploadedFile)
+  console.log("paper data", data);
+  console.log("file", uploadedFile);
 
   // Try to parse the authors' data
   try {
     authors = JSON.parse(data.authors);
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       status: false,
       message: "Invalid author data",
       error: error.message,
     });
-    return;
   }
 
   // Insert data into `paper_submission`
   pool.query(
-    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract,category, address_line_one, address_line_two, city, postal_code, submitted_by) VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, category, address_line_one, address_line_two, city, postal_code, submitted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
       data.paperTitle,
       data.researchArea,
@@ -46,68 +45,90 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
     (error, result) => {
       if (error) {
         console.error("Database error:", error);
-        res.status(500).json({
+        return res.status(500).json({
           status: false,
           message: "Error during paper submission",
           error: error.sqlMessage,
         });
-        return;
       }
 
-      // Array of author insert promises
-      const authorPromises = authors.map((author, index) => {
-        const authorName = author[`authorName${index}`];
-        const designation = author[`designation${index}`];
-        const university = author[`university${index}`];
-        const contactNumber = author[`contactNumber${index}`];
-        const email = author[`email${index}`];
+      const paper_id = result.insertId; // Get the auto-generated paper_id
+      const newDate = new Date();
 
-        return new Promise((resolve, reject) => {
-          pool.query(
-            "INSERT INTO author (user_id, author_name, author_designation, author_college, author_number, author_email) VALUES (?, ?, ?, ?, ?, ?)",
-            [
-              data.user_id, // Assuming user ID from the rest of the form data
-              authorName,
-              designation,
-              university,
-              contactNumber,
-              email,
-            ],
-            (authorError, authorResult) => {
-              if (authorError) {
-                reject(authorError);
-              } else {
-                resolve(authorResult);
-              }
+      if (paper_id) {
+        pool.query(
+          "INSERT INTO admin_paper_relation (user_id, paper_id,sharedat,sharedby) VALUES (?, ?,?,?)",
+          [data.user_id, paper_id, newDate,"user"],
+          (adminError, adminResult) => {
+            if (adminError) {
+              console.error(
+                "Error inserting into admin_paper_relation:",
+                adminError
+              );
+              return res.status(500).json({
+                status: false,
+                message: "Error creating admin-paper relation",
+                error: adminError.sqlMessage,
+              });
             }
-          );
-        });
-      });
 
-      // Process all author insertions
-      Promise.all(authorPromises)
-        .then((authorResults) => {
-          res.status(200).json({
-            status: true,
-            message: "Paper and authors submitted successfully!",
-            paperResult: result,
-            authorResults,
-          });
-        })
-        .catch((authorError) => {
-          res.status(500).json({
-            status: false,
-            message: "Error during author data submission",
-            error: authorError.sqlMessage,
-          });
-        });
+            // Array of author insert promises
+            const authorPromises = authors.map((author, index) => {
+              const authorName = author[`authorName${index}`];
+              const designation = author[`designation${index}`];
+              const university = author[`university${index}`];
+              const contactNumber = author[`contactNumber${index}`];
+              const email = author[`email${index}`];
+
+              return new Promise((resolve, reject) => {
+                pool.query(
+                  "INSERT INTO author (user_id, author_name, author_designation, author_college, author_number, author_email) VALUES (?, ?, ?, ?, ?, ?)",
+                  [
+                    data.user_id, // Assuming user ID from the rest of the form data
+                    authorName,
+                    designation,
+                    university,
+                    contactNumber,
+                    email,
+                  ],
+                  (authorError, authorResult) => {
+                    if (authorError) {
+                      reject(authorError);
+                    } else {
+                      resolve(authorResult);
+                    }
+                  }
+                );
+              });
+            });
+
+            // Process all author insertions
+            Promise.all(authorPromises)
+              .then((authorResults) => {
+                res.status(200).json({
+                  status: true,
+                  message: "Paper and authors submitted successfully!",
+                  paperResult: result,
+                  authorResults,
+                });
+              })
+              .catch((authorError) => {
+                res.status(500).json({
+                  status: false,
+                  message: "Error during author data submission",
+                  error: authorError.sqlMessage,
+                });
+              });
+          }
+        );
+      }
     }
   );
 });
 
 // Endpoint to get paper submissions and the associated user info
 router.get("/paper_requests", function (req, res) {
-  // SQL query to fetch paper submissions along with user info
+  // SQL query to fetch paper submissions along with user info based on user_id from admin_paper_relation
   const query = `
     SELECT 
       ps.id AS paper_id,
@@ -120,13 +141,19 @@ router.get("/paper_requests", function (req, res) {
       u.id AS user_id,
       u.firstname,
       u.lastname,
-      u.userpic
-        FROM 
+      u.userpic,
+      apr.sharedat,
+      apr.sharedby
+    FROM 
+      admin_paper_relation apr
+    JOIN 
       paper_submission ps
+    ON 
+      apr.paper_id = ps.id
     JOIN 
       user_registration u
     ON 
-      ps.submitted_by = u.id
+      apr.user_id = u.id
   `;
 
   // Execute the query
@@ -148,6 +175,32 @@ router.get("/paper_requests", function (req, res) {
     });
   });
 });
+
+// DELETE endpoint to remove a record from admin_paper_relation by paper_id
+router.post('/deleteAdmin_paper', (req, res) => {
+  const  paper_id  = req.body.paper_id;
+
+  // SQL query to delete a record from admin_paper_relation by paper_id
+  const query = 'DELETE FROM admin_paper_relation WHERE paper_id = ?';
+
+  pool.query(query, [paper_id], (error, results) => {
+    if (error) {
+      console.error('Database error:', error);
+      return res.status(500).json({
+        status: false,
+        message: 'Error deleting admin-paper relation',
+        error: error.sqlMessage || error.message,
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      message: 'Admin-paper relation deleted successfully',
+    });
+  });
+});
+
+
 
 // Endpoint to fetch papers by user_id
 router.get("/user_paper", function (req, res) {

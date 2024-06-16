@@ -263,9 +263,9 @@ router.post("/viewerData_update", function (req, res) {
   );
 });
 
-router.post('/deleteViewer_Data', function (req, res) {
-  const id  = req.body.id;
-  console.log("id",id)
+router.post("/deleteViewer_Data", function (req, res) {
+  const id = req.body.id;
+  console.log("id", id);
 
   if (!id) {
     return res.status(400).json({
@@ -322,7 +322,7 @@ router.get("/viewer_info", function (req, res) {
     }
   );
 });
-// fetch viewers details from sharedviewers table 
+// fetch viewers details from sharedviewers table
 router.post("/selectedviewer_info", function (req, res) {
   const paperId = req.body.paperId; // Access paperId from request body
 
@@ -389,7 +389,7 @@ router.post("/selectedviewer_info", function (req, res) {
     }
   );
 });
-// insert viewers and paper id in sharedviewers table 
+// insert viewers and paper id in sharedviewers table
 router.post("/sharedPaper_viewers", (req, res) => {
   const { paper_id, viewer_id, sharedat, sharedby } = req.body;
 
@@ -505,6 +505,94 @@ router.get("/viewer_paper_data", (req, res) => {
   });
 });
 
+router.post("/remove_viewer_id_from_sharedviewer_table", (req, res) => {
+  const viewer_id = req.body.viewers_id;
+  const paper_id = req.body.paper_id;
+
+  if (!viewer_id || !paper_id) {
+    return res.status(400).json({
+      status: false,
+      message: "viewers_id and paper_id are required",
+    });
+  }
+
+  // Update the viewers_id field to remove the specified viewer_id
+  pool.query(
+    `UPDATE sharedpaper_viewers 
+     SET viewers_id = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', viewers_id, ','), CONCAT(',', ?, ','), ','))
+     WHERE FIND_IN_SET(?, viewers_id) > 0 AND paper_id = ?`,
+    [viewer_id, viewer_id, paper_id],
+    (updateErr, updateResults) => {
+      if (updateErr) {
+        console.error("SQL Error:", updateErr);
+        return res.status(500).json({
+          status: false,
+          message: "Error updating viewers_id",
+          error: updateErr.sqlMessage,
+        });
+      }
+
+      if (updateResults.affectedRows > 0) {
+        // Select the updated row to check if viewers_id is empty
+        pool.query(
+          `SELECT viewers_id FROM sharedpaper_viewers WHERE paper_id = ?`,
+          [paper_id],
+          (selectErr, selectResults) => {
+            if (selectErr) {
+              console.error("SQL Error:", selectErr);
+              return res.status(500).json({
+                status: false,
+                message: "Error selecting updated row",
+                error: selectErr.sqlMessage,
+              });
+            }
+
+            if (
+              selectResults.length > 0 &&
+              selectResults[0].viewers_id === ""
+            ) {
+              // Delete the row if viewers_id is empty
+              pool.query(
+                `DELETE FROM sharedpaper_viewers WHERE paper_id = ?`,
+                [paper_id],
+                (deleteErr, deleteResults) => {
+                  if (deleteErr) {
+                    console.error("SQL Error:", deleteErr);
+                    return res.status(500).json({
+                      status: false,
+                      message: "Error deleting row",
+                      error: deleteErr.sqlMessage,
+                    });
+                  }
+
+                  // Successfully deleted the row
+                  return res.status(200).json({
+                    status: true,
+                    message: "Row deleted successfully as viewers_id is empty",
+                  });
+                }
+              );
+            } else {
+              // Successfully updated the viewers_id
+              return res.status(200).json({
+                status: true,
+                message: `Viewer ID ${viewer_id} removed successfully from shared papers`,
+                affectedRows: updateResults.affectedRows,
+              });
+            }
+          }
+        );
+      } else {
+        // No rows were affected by the update
+        return res.status(200).json({
+          status: true,
+          message: "No matching viewers_id found for update",
+        });
+      }
+    }
+  );
+});
+
 router.post("/shared_paper_details", (req, res) => {
   const viewer_id = req.body.viewers_id;
   console.log("viewers id", viewer_id);
@@ -569,10 +657,8 @@ router.post("/shared_paper_details", (req, res) => {
   );
 });
 
-
 // save comments in table
 router.post("/send_comment", (req, res) => {
-  console.log("Body:", req.body);
 
   const {
     viewer_id: viewer_id,
@@ -606,8 +692,9 @@ router.post("/send_comment", (req, res) => {
 });
 
 //fetching user comments
-router.get("/viewer_comment", (req, res) => {
-  const { viewer_id } = req.query;
+router.post("/viewer_comment", (req, res) => {
+  const viewer_id  = req.body.viewer_id;
+  const paper_id=req.body.paper_id
 
   let query;
   let queryParams;
@@ -615,8 +702,8 @@ router.get("/viewer_comment", (req, res) => {
   if (viewer_id) {
     // If paper_id is provided, fetch comments by paper_id
     query =
-      "SELECT * FROM viewer_comments WHERE target_viewer_id = ? || viewer_id = ?";
-    queryParams = [viewer_id, viewer_id];
+      "SELECT * FROM viewer_comments WHERE target_viewer_id = ? || viewer_id = ? AND paper_id";
+    queryParams = [viewer_id, viewer_id,paper_id];
   }
 
   pool.query(query, queryParams, (err, results) => {
@@ -679,12 +766,21 @@ router.post("/reset_count", (req, res) => {
 
 //fetching admin comments
 
-router.get("/admin_comment", (req, res) => {
-  const { viewer_id } = req.query;
+router.post("/admin_comment", (req, res) => {
+  const viewer_id = req.body.viewer_id;
+  const paper_id = req.body.paper_id;
+ 
+  // Validate input
+  if (!viewer_id || !paper_id) {
+    return res.status(400).json({
+      status: false,
+      message: "viewer_id and paper_id are required",
+    });
+  }
 
-  const query = "SELECT * FROM viewer_comments WHERE viewer_id = ? ";
+  const query = "SELECT * FROM viewer_comments WHERE viewer_id = ? AND paper_id = ?";
 
-  pool.query(query, [viewer_id], (err, results) => {
+  pool.query(query, [viewer_id, paper_id], (err, results) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
@@ -702,15 +798,16 @@ router.get("/admin_comment", (req, res) => {
   });
 });
 
+
 router.post("/send_admin_comment", (req, res) => {
-  const { viewer_id, is_admin_comment, comment } = req.body;
+  const { viewer_id, is_admin_comment, comment, paper_id } = req.body;
   console.log("body messages", req.body);
 
-  const query = `INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, target_viewer_id, status) VALUES (?, ?, ?, ?, 0)`;
+  const query = `INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, target_viewer_id,paper_id, status) VALUES (?, ?, ?, ?,?, 0)`;
 
   pool.query(
     query,
-    [viewer_id, comment, is_admin_comment, viewer_id],
+    [viewer_id, comment, is_admin_comment, viewer_id, paper_id],
     (err, result) => {
       if (err) {
         console.error("Database error:", err);
