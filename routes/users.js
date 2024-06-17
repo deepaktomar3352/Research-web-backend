@@ -153,7 +153,7 @@ router.post("/forgot_password", function (req, res, next) {
           status: false,
           message: "Error during forgot password",
           error: error.sqlMessage,
-        })
+        });
       }
 
       if (results.length === 0) {
@@ -217,12 +217,11 @@ router.post("/forgot_password", function (req, res, next) {
   );
 });
 
-
 /* reset password */
 router.post("/reset_password/:token", function (req, res, next) {
   const { token } = req.params;
-  const  password  = req.body.password;
-  console.log("password",password)
+  const password = req.body.password;
+  console.log("password", password);
 
   pool.query(
     "SELECT * FROM user_registration WHERE reset_token = ? AND reset_token_expiry > NOW()",
@@ -278,11 +277,10 @@ router.post("/reset_password/:token", function (req, res, next) {
   );
 });
 
-
 /* fetching user details */
 router.get("/user_info", function (req, res) {
   pool.query(
-    "SELECT id, firstname,lastname, userpic FROM user_registration",
+    "SELECT id, firstname,lastname,email, userpic FROM user_registration",
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -306,7 +304,8 @@ router.get("/user_info", function (req, res) {
 /* fetch user profile */
 router.post("/fetch_user_profile", function (req, res) {
   pool.query(
-    "SELECT id, firstname,lastname,email, userpic FROM user_registration WHERE id =?",[req.body.id],
+    "SELECT id, firstname,lastname,email, userpic FROM user_registration WHERE id =?",
+    [req.body.id],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -327,9 +326,8 @@ router.post("/fetch_user_profile", function (req, res) {
   );
 });
 
-
 /* user profile updation */
-router.post("/user_profile_update", upload.single('userpic'), (req, res) => {
+router.post("/user_profile_update", upload.single("userpic"), (req, res) => {
   const { id, firstName, lastName, email } = req.body;
   const userpic = req.file ? req.file.filename : null;
 
@@ -369,7 +367,9 @@ router.post("/user_profile_update", upload.single('userpic'), (req, res) => {
     return res.status(400).json({ message: "No fields to update" });
   }
 
-  const query = `UPDATE user_registration SET ${updateFields.join(', ')} WHERE id = ?`;
+  const query = `UPDATE user_registration SET ${updateFields.join(
+    ", "
+  )} WHERE id = ?`;
 
   console.log("Executing query:", query);
   console.log("With values:", updateValues);
@@ -388,7 +388,5 @@ router.post("/user_profile_update", upload.single('userpic'), (req, res) => {
     res.status(200).json({ message: "User profile updated successfully" });
   });
 });
-
-
 
 module.exports = router;

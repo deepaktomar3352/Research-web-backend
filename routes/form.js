@@ -178,12 +178,14 @@ router.get("/paper_requests", function (req, res) {
 
 // DELETE endpoint to remove a record from admin_paper_relation by paper_id
 router.post('/deleteAdmin_paper', (req, res) => {
-  const  paper_id  = req.body.paper_id;
+  const paper_id = req.body.paper_id;
 
-  // SQL query to delete a record from admin_paper_relation by paper_id
-  const query = 'DELETE FROM admin_paper_relation WHERE paper_id = ?';
+  const deleteAdminPaperQuery = 'DELETE FROM admin_paper_relation WHERE paper_id = ?';
+  const deleteCommentsQuery = 'DELETE FROM comments WHERE paper_id = ? AND is_admin_comment = 1';
+  const deleteViewersCommentsQuery = 'DELETE FROM viewer_comments WHERE paper_id = ? AND is_admin_comment = 1';
 
-  pool.query(query, [paper_id], (error, results) => {
+  // Deleting admin-paper relation
+  pool.query(deleteAdminPaperQuery, [paper_id], (error, results) => {
     if (error) {
       console.error('Database error:', error);
       return res.status(500).json({
@@ -193,12 +195,45 @@ router.post('/deleteAdmin_paper', (req, res) => {
       });
     }
 
-    res.status(200).json({
-      status: true,
-      message: 'Admin-paper relation deleted successfully',
+    if (results.affectedRows === 0) {
+      // If no rows were deleted, the paper_id was not found
+      return res.status(404).json({
+        status: false,
+        message: 'No admin-paper relation found with the given paper_id',
+      });
+    }
+
+    // Deleting comments
+    pool.query(deleteCommentsQuery, [paper_id], (error, results) => {
+      if (error) {
+        console.error('Database error:', error);
+        return res.status(500).json({
+          status: false,
+          message: 'Error deleting comments',
+          error: error.sqlMessage || error.message,
+        });
+      }
+
+      // Deleting viewers comments
+      pool.query(deleteViewersCommentsQuery, [paper_id], (error, results) => {
+        if (error) {
+          console.error('Database error:', error);
+          return res.status(500).json({
+            status: false,
+            message: 'Error deleting viewers comments',
+            error: error.sqlMessage || error.message,
+          });
+        }
+
+        res.status(200).json({
+          status: true,
+          message: 'Admin-paper relation and associated comments deleted successfully',
+        });
+      });
     });
   });
 });
+
 
 
 
