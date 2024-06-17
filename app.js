@@ -19,7 +19,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 });
-
+var adminRouter = require('./routes/admin');
 var usersRouter = require('./routes/users');
 var viewerRouter = require('./routes/viewer');
 var userForm = require('./routes/form');
@@ -38,10 +38,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
 
+app.use('/admin', adminRouter);
 app.use('/users', usersRouter);
 app.use('/viewer', viewerRouter);
 app.use('/form', userForm);
-app.use('/viewer', viewerRouter);
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
