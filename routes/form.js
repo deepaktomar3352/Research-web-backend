@@ -27,7 +27,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
 
   // Insert data into `paper_submission`
   pool.query(
-    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, category, address_line_one, address_line_two, city, postal_code, submitted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, category, address_line_one, address_line_two, city, postal_code, submitted_by,paperupload_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)",
     [
       data.paperTitle,
       data.researchArea,
@@ -41,6 +41,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
       data.city,
       data.postalCode,
       data.user_id,
+      "upload",
     ],
     (error, result) => {
       if (error) {
@@ -58,7 +59,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
       if (paper_id) {
         pool.query(
           "INSERT INTO admin_paper_relation (user_id, paper_id,sharedat,sharedby) VALUES (?, ?,?,?)",
-          [data.user_id, paper_id, newDate,"user"],
+          [data.user_id, paper_id, newDate, "user"],
           (adminError, adminResult) => {
             if (adminError) {
               console.error(
@@ -126,6 +127,83 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
   );
 });
 
+router.post("/reupload_paper", upload.single("file"), (req, res) => {
+  const paperId = req.body.paper_id;
+  const reuploadedFile = req.file;
+  
+
+  if (!paperId) {
+    return res.status(400).json({
+      status: false,
+      message: "Paper ID is required",
+    });
+  }
+
+  if (!reuploadedFile) {
+    return res.status(400).json({
+      status: false,
+      message: "File is required",
+    });
+  }
+
+  // Fetch current reupload_count to determine the status
+  pool.query(
+    "SELECT paperupload_status FROM paper_submission WHERE id = ?",
+    [paperId],
+    (selectError, selectResult) => {
+      if (selectError) {
+        console.error("Database error:", selectError);
+        return res.status(500).json({
+          status: false,
+          message: "Error fetching paper data",
+          error: selectError.sqlMessage,
+        });
+      }
+
+      if (selectResult.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: "Paper not found",
+        });
+      }
+
+      const currentPaperUpload_Status = selectResult[0].paperupload_status;
+      if (currentPaperUpload_Status === "upload") {
+        newStatus = "reupload";
+      } else if (currentPaperUpload_Status === "reupload") {
+        newStatus = "last reupload";
+      }
+
+      // Update the paper submission with the new file name, mime type, status, and increment the reupload count
+      pool.query(
+        "UPDATE paper_submission SET paper_uploaded = ?, mimetype = ?, paperupload_status = ? WHERE id = ?",
+        [
+          reuploadedFile.originalname,
+          reuploadedFile.mimetype,
+          newStatus,
+          paperId,
+        ],
+        (updateError, updateResult) => {
+          if (updateError) {
+            console.error("Database error:", updateError);
+            return res.status(500).json({
+              status: false,
+              message: "Error during paper re-upload",
+              error: updateError.sqlMessage,
+            });
+          }
+
+          res.status(200).json({
+            status: true,
+            message: "Paper re-uploaded successfully!",
+            result: updateResult,
+          });
+        }
+      );
+    }
+  );
+});
+
 // Endpoint to get paper submissions and the associated user info
 router.get("/paper_requests", function (req, res) {
   // SQL query to fetch paper submissions along with user info based on user_id from admin_paper_relation
@@ -177,65 +255,81 @@ router.get("/paper_requests", function (req, res) {
 });
 
 // DELETE endpoint to remove a record from admin_paper_relation by paper_id
-router.post('/deleteAdmin_paper', (req, res) => {
+router.post("/deleteAdmin_paper", (req, res) => {
   const paper_id = req.body.paper_id;
 
-  const deleteAdminPaperQuery = 'DELETE FROM admin_paper_relation WHERE paper_id = ?';
-  const deleteCommentsQuery = 'DELETE FROM comments WHERE paper_id = ? AND is_admin_comment = 1';
-  const deleteViewersCommentsQuery = 'DELETE FROM viewer_comments WHERE paper_id = ? AND is_admin_comment = 1';
+  const deleteCommentsQuery = "DELETE FROM comments WHERE paper_id = ?";
+  const deleteViewersCommentsQuery =
+    "DELETE FROM viewer_comments WHERE paper_id = ?";
+  const deleteAdminPaperQuery = "DELETE FROM paper_submission WHERE id = ?";
+  const deletePaperFrom_AdminRelationTableQuery =
+    "DELETE FROM admin_paper_relation WHERE paper_id = ?";
 
-  // Deleting admin-paper relation
-  pool.query(deleteAdminPaperQuery, [paper_id], (error, results) => {
+  // Deleting comments
+  pool.query(deleteCommentsQuery, [paper_id], (error, results) => {
     if (error) {
-      console.error('Database error:', error);
+      console.error("Database error:", error);
       return res.status(500).json({
         status: false,
-        message: 'Error deleting admin-paper relation',
+        message: "Error deleting comments",
         error: error.sqlMessage || error.message,
       });
     }
 
-    if (results.affectedRows === 0) {
-      // If no rows were deleted, the paper_id was not found
-      return res.status(404).json({
-        status: false,
-        message: 'No admin-paper relation found with the given paper_id',
-      });
-    }
-
-    // Deleting comments
-    pool.query(deleteCommentsQuery, [paper_id], (error, results) => {
+    // Deleting viewers comments
+    pool.query(deleteViewersCommentsQuery, [paper_id], (error, results) => {
       if (error) {
-        console.error('Database error:', error);
+        console.error("Database error:", error);
         return res.status(500).json({
           status: false,
-          message: 'Error deleting comments',
+          message: "Error deleting viewers comments",
           error: error.sqlMessage || error.message,
         });
       }
 
-      // Deleting viewers comments
-      pool.query(deleteViewersCommentsQuery, [paper_id], (error, results) => {
+      // Deleting admin-paper relation
+      pool.query(deleteAdminPaperQuery, [paper_id], (error, results) => {
         if (error) {
-          console.error('Database error:', error);
+          console.error("Database error:", error);
           return res.status(500).json({
             status: false,
-            message: 'Error deleting viewers comments',
+            message: "Error deleting admin-paper relation",
             error: error.sqlMessage || error.message,
           });
         }
+        pool.query(
+          deletePaperFrom_AdminRelationTableQuery,
+          [paper_id],
+          (error, results) => {
+            if (error) {
+              console.error("Database error:", error);
+              return res.status(500).json({
+                status: false,
+                message: "Error deleting admin-paper relation",
+                error: error.sqlMessage || error.message,
+              });
+            }
 
-        res.status(200).json({
-          status: true,
-          message: 'Admin-paper relation and associated comments deleted successfully',
-        });
+            if (results.affectedRows === 0) {
+              // If no rows were deleted, the paper_id was not found
+              return res.status(404).json({
+                status: false,
+                message:
+                  "No admin-paper relation found with the given paper_id",
+              });
+            }
+
+            res.status(200).json({
+              status: true,
+              message:
+                "Admin-paper relation and associated comments deleted successfully",
+            });
+          }
+        );
       });
     });
   });
 });
-
-
-
 
 // Endpoint to fetch papers by user_id
 router.get("/user_paper", function (req, res) {
