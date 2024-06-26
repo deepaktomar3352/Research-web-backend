@@ -597,7 +597,7 @@ router.post("/remove_viewer_id_from_sharedviewer_table", (req, res) => {
 
 router.post("/shared_paper_details", (req, res) => {
   const viewer_id = req.body.viewers_id;
-  console.log("viewers id", viewer_id);
+  // console.log("viewers id", viewer_id);
 
   if (!viewer_id) {
     return res.status(400).json({
@@ -632,7 +632,7 @@ router.post("/shared_paper_details", (req, res) => {
       // Second query to get paper details from the papersubmission table based on the paper_ids
       pool.query(
         `SELECT 
-          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status
+          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status,paperupload_status
          FROM 
           paper_submission 
          WHERE 
