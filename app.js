@@ -57,7 +57,7 @@ const vsp = io.of("/viewer-namespace");
 usp.on("connection", async function (socket) {
   console.log("user connected");
 
-  //fetching user & admin com ments from here
+  //fetching user & admin comments from here
   socket.on("fetch_comments", async function ({ user_id, paper_id, user }) {
     try {
       if (user === "user") {

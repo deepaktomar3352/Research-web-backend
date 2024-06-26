@@ -15,47 +15,35 @@ router.post(
     console.log("last", req.body.lastname);
     console.log("body", req.body.receiveUpdates);
 
-    // Hash the password
-    bcrypt.hash(req.body.password, 10, function (err, hash) {
-      if (err) {
-        console.error("Error hashing password:", err);
-        return res.status(500).json({
-          status: false,
-          message: "Error during registration",
-          error: err.message,
-        });
-      }
-
-      // Insert user data into the database
-      pool.query(
-        "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic,category) VALUES (?, ?, ?, ?, ?, ?,?)",
-        [
-          req.body.firstname,
-          req.body.lastname,
-          req.body.email,
-          hash, // Store hashed password
-          req.body.receiveUpdates,
-          req.file ? req.file.originalname : null,
-          req.body.category,
-        ],
-        (error, result) => {
-          if (error) {
-            console.log("SQL Error:", error);
-            res.status(500).json({
-              status: false,
-              message: "Error during registration",
-              error: error.sqlMessage,
-            });
-          } else {
-            res.status(200).json({
-              status: true,
-              message: "Registered Successfully",
-              result,
-            });
-          }
+    // Insert user data into the database
+    pool.query(
+      "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [
+        req.body.firstname,
+        req.body.lastname,
+        req.body.email,
+        req.body.password, // Store plain text password
+        req.body.receiveUpdates,
+        req.file ? req.file.originalname : null,
+        req.body.category,
+      ],
+      (error, result) => {
+        if (error) {
+          console.log("SQL Error:", error);
+          res.status(500).json({
+            status: false,
+            message: "Error during registration",
+            error: error.sqlMessage,
+          });
+        } else {
+          res.status(200).json({
+            status: true,
+            message: "Registered Successfully",
+            result,
+          });
         }
-      );
-    });
+      }
+    );
   }
 );
 
@@ -66,8 +54,8 @@ router.post("/viewer_login", function (req, res) {
 
   // Query the database for the user with the provided email
   pool.query(
-    "SELECT * FROM viewer_registration WHERE email = ?",
-    [email],
+    "SELECT * FROM viewer_registration WHERE email = ? AND password = ?",
+    [email, password], // Check plain text password
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -79,7 +67,7 @@ router.post("/viewer_login", function (req, res) {
       }
 
       if (results.length === 0) {
-        // If no user is found with the given email
+        // If no user is found with the given email and password
         return res.status(401).json({
           status: false,
           message: "Invalid email or password",
@@ -88,123 +76,25 @@ router.post("/viewer_login", function (req, res) {
 
       const user = results[0];
 
-      // Compare the provided password with the stored hashed password
-      bcrypt.compare(password, user.password, (compareErr, isMatch) => {
-        if (compareErr) {
-          console.error("Error comparing passwords:", compareErr);
-          return res.status(500).json({
-            status: false,
-            message: "Error during login",
-            error: compareErr.message,
-          });
-        }
-
-        if (isMatch) {
-          // If passwords match, the user is successfully authenticated
-          res.status(200).json({
-            status: true,
-            message: "Login successful",
-            viewer: {
-              id: user.id,
-              firstname: user.firstname,
-              lastname: user.lastname,
-              email: user.email,
-              emailupdates: user.emailupdates,
-              userpic: user.userpic,
-            },
-          });
-        } else {
-          // If passwords don't match, send an error response
-          res.status(401).json({
-            status: false,
-            message: "Invalid email or password",
-          });
-        }
+      // If credentials match, the user is successfully authenticated
+      res.status(200).json({
+        status: true,
+        message: "Login successful",
+        viewer: {
+          id: user.id,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          email: user.email,
+          emailupdates: user.emailupdates,
+          userpic: user.userpic,
+        },
       });
     }
   );
 });
 
-/* forgot password*/
-router.post("/forgot_password", async (req, res) => {
-  const { email } = req.body;
 
-  const user = await pool.query(
-    "SELECT * FROM user_registration WHERE email = ?",
-    [email]
-  );
 
-  if (user.length === 0) {
-    return res.status(404).json({
-      status: false,
-      message: "User not found",
-    });
-  }
-
-  const resetToken = crypto.randomBytes(20).toString("hex"); // Generate token
-  const resetTokenExpires = Date.now() + 300000; // Token expires in 5 minutes
-
-  // Store the reset token and expiration in the database
-  await pool.query(
-    "UPDATE user_registration SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
-    [resetToken, resetTokenExpires, email]
-  );
-
-  const resetLink = `http://localhost:3000/UserResetPassword/${resetToken}`; // Link to reset password
-
-  // Set up email transport and send reset email
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: "deepaktomarcse2020@gmail.com",
-      pass: "obwn bgma kcua vgck",
-    },
-  });
-
-  const mailOptions = {
-    to: email,
-    from: "deepaktomarcse2020@gmail.com",
-    subject: "Research Paper Password Reset",
-    text: `Click the link to reset your password: ${resetLink}`,
-  };
-
-  await transporter.sendMail(mailOptions);
-
-  res.status(200).json({
-    status: true,
-    message: "Password reset email sent",
-  });
-});
-
-/* reset password */
-router.post("/reset_password/:token", async (req, res) => {
-  const { token } = req.params;
-  const { password } = req.body;
-
-  const user = await pool.query(
-    "SELECT * FROM user_registration WHERE reset_token = ? AND reset_token_expires > ?",
-    [token, Date.now()]
-  );
-
-  if (user.length === 0) {
-    return res.status(400).json({
-      status: false,
-      message: "Invalid or expired token",
-    });
-  }
-
-  const hash = await bcrypt.hash(password, 10); // Hash the new password
-
-  await pool.query(
-    "UPDATE user_registration SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE reset_token = ?",
-    [hash, token]
-  );
-
-  res.status(200).json({
-    status: true,
-    message: "Password reset successful",
-  });
-});
 
 /* fetching Viewers details */
 router.get("/fetchViewers", function (req, res) {
@@ -233,9 +123,9 @@ router.post("/viewerData_update", function (req, res) {
       message: "No data provided for update",
     });
   }
-  const { firstname, lastname, email, category, userpic } = updatedData;
+  const { firstname, lastname, email,password, category, userpic } = updatedData;
 
-  if (!firstname || !lastname || !email || !category || !userpic) {
+  if (!firstname || !lastname || !email || !password || !category || !userpic) {
     return res.status(400).json({
       status: false,
       message: "Incomplete data provided for update",
@@ -243,8 +133,8 @@ router.post("/viewerData_update", function (req, res) {
   }
 
   pool.query(
-    "UPDATE viewer_registration SET firstname = ?, lastname = ?, email = ?, category = ?, userpic = ? WHERE id = ?",
-    [firstname, lastname, email, category, userpic, id],
+    "UPDATE viewer_registration SET firstname = ?, lastname = ?, email = ?,password=?, category = ?, userpic = ? WHERE id = ?",
+    [firstname, lastname, email,password, category, userpic, id],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
