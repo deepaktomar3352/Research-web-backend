@@ -41,7 +41,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
       data.city,
       data.postalCode,
       data.user_id,
-      "upload",
+      "uploaded",
     ],
     (error, result) => {
       if (error) {
@@ -168,9 +168,9 @@ router.post("/reupload_paper", upload.single("file"), (req, res) => {
 
       const currentPaperUpload_Status = selectResult[0].paperupload_status;
       if (currentPaperUpload_Status === "upload") {
-        newStatus = "reupload";
+        newStatus = "reuploaded";
       } else if (currentPaperUpload_Status === "reupload") {
-        newStatus = "last reupload";
+        newStatus = "last reuploaded";
       }
 
       // Update the paper submission with the new file name, mime type, status, and increment the reupload count
@@ -215,6 +215,7 @@ router.get("/paper_requests", function (req, res) {
       ps.mimetype,
       ps.category,
       ps.submission_date,
+      ps.paperupload_status,
       u.id AS user_id,
       u.firstname,
       u.lastname,
@@ -346,7 +347,8 @@ router.get("/user_paper", function (req, res) {
       paper_uploaded,
       mimetype,
       submission_date,
-      paper_status
+      paper_status,
+      paperupload_status
     FROM 
       paper_submission
     WHERE 
@@ -682,6 +684,47 @@ router.post("/send_admin_comment", (req, res) => {
         message: "Comment submitted successfully",
         data: result,
       });
+    }
+  );
+});
+
+router.post("/updateAdminPaperStatus", (req, res) => {
+  const  paper_id = req.body.paper_id;
+  const status = req.body.status;
+
+  if (!paper_id || !status) {
+    return res.status(400).json({
+      status: false,
+      message: "Both paper_id and status are required",
+    });
+  }
+
+  // Update the database
+  pool.query(
+    `UPDATE paper_submission SET paper_status = ? WHERE id = ?`,
+    [status, paper_id],
+    (error, result) => {
+      if (error) {
+        console.error("SQL Error:", error);
+        return res.status(500).json({
+          status: false,
+          message: "Error during status update",
+          error: error.sqlMessage,
+        });
+      } else {
+        if (result.affectedRows > 0) {
+          return res.status(200).json({
+            status: true,
+            message: "Paper status updated successfully",
+            result: result,
+          });
+        } else {
+          return res.status(404).json({
+            status: false,
+            message: "Paper not found",
+          });
+        }
+      }
     }
   );
 });
