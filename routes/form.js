@@ -415,9 +415,7 @@ router.get("/delete_paper", (req, res) => {
 });
 
 // Create a new article
-router.post(
-  "/submit_article",
-  upload.single("uploaded_article"),
+router.post(  "/submit_article",  upload.single("uploaded_article"),
   (req, res) => {
     const file = req.file;
     console.log("file", file);

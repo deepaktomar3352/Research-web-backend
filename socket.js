@@ -164,17 +164,17 @@ function setupSocket(server) {
     // Define a function to fetch data and emit
     const fetchAndEmitData = () => {
       const sqlUserComments = `
-                    SELECT c.CommentID, c.paper_id, u.id, u.firstname, u.lastname, u.userpic, c.content, c.created_at, 'user' AS commentType
+                    SELECT c.CommentID,c.status, c.paper_id, u.id, u.firstname, u.lastname, u.userpic, c.content, c.created_at, 'user' AS commentType
                     FROM comments c
                     JOIN user_registration u ON c.UserId = u.id
-                    WHERE c.is_admin_comment = 0
+                    WHERE c.is_admin_comment = 0 OR c.status = 1
                 `;
 
       const sqlViewerComments = `
-                    SELECT vc.CommentID, vc.paper_id, v.id, v.firstname AS viewerName, v.lastname AS lastName, v.userpic, vc.content, vc.created_at, 'viewer' AS commentType
+                    SELECT vc.CommentID,vc.status, vc.paper_id, v.id, v.firstname AS viewerName, v.lastname AS lastName, v.userpic, vc.content, vc.created_at, 'viewer' AS commentType
                     FROM viewer_comments vc
                     JOIN viewer_registration v ON vc.viewer_id = v.id
-                    WHERE vc.is_admin_comment = 0
+                    WHERE vc.is_admin_comment = 0 OR vc.status = 1
                 `;
 
       const sqlUserCommentCount = `
@@ -186,7 +186,7 @@ function setupSocket(server) {
       const sqlViewerCommentCount = `
                     SELECT COUNT(*) AS viewerCommentCount 
                     FROM viewer_comments 
-                    WHERE is_admin_comment = 0
+                    WHERE status = 1
                 `;
 
       pool.query(sqlUserComments, (err, userComments) => {
@@ -238,11 +238,13 @@ function setupSocket(server) {
       });
     };
 
+    
+
     // Call the function to fetch and emit data when an admin connects
     fetchAndEmitData();
 
     // You can set up an interval to periodically fetch and emit data
-    const interval = setInterval(fetchAndEmitData, 60000); // Every 60 seconds
+    const interval = setInterval(fetchAndEmitData, 600); // Every 6 seconds
 
     socket.on("disconnect", () => {
       console.log("Admin disconnected");
@@ -259,3 +261,10 @@ function getIo() {
 }
 
 module.exports = { setupSocket, getIo };
+
+
+ // Emit the data to the clients
+  //   io.of("/admin-namespace").emit("counter", {
+  //     userCommentCount,
+  //     viewerCommentCount,
+  //   });
