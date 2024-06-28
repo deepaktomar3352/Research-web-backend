@@ -133,7 +133,6 @@ router.post("/Re_upload_paper", (req, res) => {
   let authors = [];
   console.log("paper data", data);
 
-
   // Try to parse the authors' data
   try {
     authors = JSON.parse(data.authors);
@@ -146,10 +145,10 @@ router.post("/Re_upload_paper", (req, res) => {
   }
 
   const paper_id = data.Id; // Assuming 'id' is the paper ID to be updated
-
+  console.log("paper id----", paper_id);
   // Update data in `paper_submission`
   pool.query(
-    "UPDATE paper_submission SET paper_title = ?, research_area = ?,paper_keywords = ?, paper_abstract = ?, category = ?, address_line_one = ?, address_line_two = ?, city = ?, postal_code = ?, submitted_by = ?, WHERE id = ?",
+    "UPDATE paper_submission SET paper_title = ?, research_area = ?,paper_keywords = ?, paper_abstract = ?, category = ?, address_line_one = ?, address_line_two = ?, city = ?, postal_code = ?, submitted_by = ? WHERE id = ?",
     [
       data.paperTitle,
       data.researchArea,
@@ -161,7 +160,7 @@ router.post("/Re_upload_paper", (req, res) => {
       data.city,
       data.postalCode,
       data.user_id,
-      paper_id
+      paper_id,
     ],
     (error, result) => {
       if (error) {
@@ -171,84 +170,112 @@ router.post("/Re_upload_paper", (req, res) => {
           message: "Error during paper update",
           error: error.sqlMessage,
         });
-      }
+      } else {
+        const newDate = new Date();
 
-      const newDate = new Date();
-
-      pool.query(
-        "UPDATE admin_paper_relation SET sharedat = ?, sharedby = ? WHERE user_id = ? AND paper_id = ?",
-        [newDate, "user", data.user_id, paper_id],
-        (adminError, adminResult) => {
-          if (adminError) {
-            console.error(
-              "Error updating admin_paper_relation:",
-              adminError
-            );
-            return res.status(500).json({
-              status: false,
-              message: "Error updating admin-paper relation",
-              error: adminError.sqlMessage,
-            });
-          }
-
-          // Array of author update promises
-          const authorPromises = authors.map((author, index) => {
-            const authorName = author[`authorName${index}`];
-            const designation = author[`designation${index}`];
-            const university = author[`university${index}`];
-            const contactNumber = author[`contactNumber${index}`];
-            const email = author[`email${index}`];
-
-            return new Promise((resolve, reject) => {
-              pool.query(
-                "UPDATE author SET author_name = ?, author_designation = ?, author_college = ?, author_number = ?, author_email = ? WHERE user_id = ? AND id = ?",
-                [
+        pool.query(
+          `UPDATE admin_paper_relation 
+         SET sharedat = ?, sharedby = ? 
+         WHERE user_id = ? AND paper_id = ?`,
+          [newDate, "user", data.user_id, paper_id],
+          (adminError, adminResult) => {
+            if (adminError) {
+              console.error("Error updating admin_paper_relation:", adminError);
+              return res.status(500).json({
+                status: false,
+                message: "Error updating admin-paper relation",
+                error: adminError.sqlMessage,
+              });
+            } else {
+              // Array of author update promises
+              const authorPromises = authors.map((author) => {
+                const {
                   authorName,
                   designation,
                   university,
                   contactNumber,
                   email,
-                  data.user_id,
-                  author[`authorId${index}`] // Assuming 'authorId' is provided in the author object
-                ],
-                (authorError, authorResult) => {
-                  if (authorError) {
-                    reject(authorError);
-                  } else {
-                    resolve(authorResult);
-                  }
-                }
-              );
-            });
-          });
+                  authorId,
+                } = author;
 
-          // Process all author updates
-          Promise.all(authorPromises)
-            .then((authorResults) => {
-              res.status(200).json({
-                status: true,
-                message: "Paper and authors updated successfully!",
-                paperResult: result,
-                authorResults,
+                return new Promise((resolve, reject) => {
+                  if (authorId) {
+                    // Update existing author
+                    pool.query(
+                      `UPDATE author 
+                         SET author_name = ?, author_designation = ?, author_college = ?, 
+                             author_number = ?, author_email = ? 
+                         WHERE user_id = ? AND idauthor = ?`,
+                      [
+                        authorName,
+                        designation,
+                        university,
+                        contactNumber,
+                        email,
+                        data.user_id,
+                        authorId,
+                      ],
+                      (authorError, authorResult) => {
+                        if (authorError) {
+                          reject(authorError);
+                        } else {
+                          resolve(authorResult);
+                        }
+                      }
+                    );
+                  } else {
+                    // Add new author
+                    pool.query(
+                      `INSERT INTO author (author_name, author_designation, author_college, author_number, author_email, user_id) 
+                       VALUES (?, ?, ?, ?, ?, ?)`,
+                      [
+                        authorName,
+                        designation,
+                        university,
+                        contactNumber,
+                        email,
+                        data.user_id,
+                      ],
+                      (authorError, authorResult) => {
+                        if (authorError) {
+                          reject(authorError);
+                        } else {
+                          resolve(authorResult);
+                        }
+                      }
+                    );
+                  }
+                });
               });
-            })
-            .catch((authorError) => {
-              res.status(500).json({
-                status: false,
-                message: "Error during author data update",
-                error: authorError.sqlMessage,
-              });
-            });
-        }
-      );
+
+              // Process all author updates
+              Promise.all(authorPromises)
+                .then((authorResults) => {
+                  res.status(200).json({
+                    status: true,
+                    message: "Paper and authors updated successfully!",
+                    paperResult: result,
+                    authorResults,
+                  });
+                })
+                .catch((authorError) => {
+                  res.status(500).json({
+                    status: false,
+                    message: "Error during author data update",
+                    error: authorError.sqlMessage,
+                  });
+                });
+            }
+          }
+        );
+      }
     }
   );
 });
 
-
 router.post("/reupload_paper", upload.single("file"), (req, res) => {
   const paperId = req.body.paper_id;
-  console.log("abhi ki id h fresh",paperId);
+  console.log("abhi ki id h fresh", paperId);
   const reuploadedFile = req.file;
 
   if (!paperId) {
