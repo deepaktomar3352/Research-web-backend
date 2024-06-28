@@ -7,9 +7,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 /*  viewer Register. */
-router.post(
-  "/viewer_register",
-  upload.single("userImage"),
+router.post(  "/viewer_register",  upload.single("userImage"),
   function (req, res, next) {
     console.log("name", req.body.firstname);
     console.log("last", req.body.lastname);
@@ -93,9 +91,6 @@ router.post("/viewer_login", function (req, res) {
   );
 });
 
-
-
-
 /* fetching Viewers details */
 router.get("/fetchViewers", function (req, res) {
   pool.query("SELECT * FROM viewer_registration", (err, results) => {
@@ -114,6 +109,7 @@ router.get("/fetchViewers", function (req, res) {
     });
   });
 });
+
 router.post("/viewerData_update", function (req, res) {
   const { id, updatedData } = req.body;
 
@@ -652,6 +648,94 @@ router.post("/reset_count", (req, res) => {
     }
 
     res.status(200).json({ message: "Comment status updated successfully" });
+  });
+});
+
+/* fetch viewer profile */
+router.post("/fetch_viewer_profile", function (req, res) {
+  pool.query(
+    "SELECT id, firstname,lastname,email, userpic FROM viewer_registration WHERE id =?",
+    [req.body.id],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving user info",
+          error: err.sqlMessage,
+        });
+      }
+
+      // Return the selected data as JSON
+      res.status(200).json({
+        status: true,
+        message: "User info retrieved successfully",
+        data: results, // The array of results with the selected columns
+      });
+    }
+  );
+});
+
+/* viewer profile updation */
+router.post("/viewer_profile_update", upload.single("userpic"), (req, res) => {
+  const { id, firstName, lastName, email } = req.body;
+  const userpic = req.file ? req.file.filename : null;
+
+  console.log("Updating user profile with ID:", id);
+  console.log("Received values:", { id, firstName, lastName, email, userpic });
+
+  if (!id) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  const updateFields = [];
+  const updateValues = [];
+
+  if (firstName) {
+    updateFields.push("firstname = ?");
+    updateValues.push(firstName);
+  }
+
+  if (lastName) {
+    updateFields.push("lastname = ?");
+    updateValues.push(lastName);
+  }
+
+  if (email) {
+    updateFields.push("email = ?");
+    updateValues.push(email);
+  }
+
+  if (userpic) {
+    updateFields.push("userpic = ?");
+    updateValues.push(userpic);
+  }
+
+  updateValues.push(id);
+
+  if (updateFields.length === 0) {
+    return res.status(400).json({ message: "No fields to update" });
+  }
+
+  const query = `UPDATE viewer_registration SET ${updateFields.join(
+    ", "
+  )} WHERE id = ?`;
+
+  console.log("Executing query:", query);
+  console.log("With values:", updateValues);
+
+  pool.query(query, updateValues, (err, result) => {
+    if (err) {
+      console.error("Error updating user profile:", err);
+      return res.status(500).json({ message: "Error updating user profile" });
+    }
+
+    console.log("Query result:", result);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "profile updated successfully" });
   });
 });
 

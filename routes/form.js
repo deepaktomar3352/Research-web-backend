@@ -130,7 +130,6 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
 router.post("/reupload_paper", upload.single("file"), (req, res) => {
   const paperId = req.body.paper_id;
   const reuploadedFile = req.file;
-  
 
   if (!paperId) {
     return res.status(400).json({
@@ -416,9 +415,7 @@ router.get("/delete_paper", (req, res) => {
 });
 
 // Create a new article
-router.post(
-  "/submit_article",
-  upload.single("uploaded_article"),
+router.post(  "/submit_article",  upload.single("uploaded_article"),
   (req, res) => {
     const file = req.file;
     console.log("file", file);
