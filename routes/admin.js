@@ -71,5 +71,37 @@ router.post("/admin_login", function (req, res) {
     }
   );
 });
+router.post("/fetch_admin_profile", function (req, res) {
+  pool.query(
+    "SELECT * FROM admin WHERE id = ?",
+    [req.body.id],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving admin info",
+          error: err.sqlMessage,
+        });
+      }
+
+      // Check if any admin data was found
+      if (results.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: "Admin not found",
+        });
+      }
+
+      // Return the selected data as JSON
+      res.status(200).json({
+        status: true,
+        message: "Admin info retrieved successfully",
+        data: results[0], // Return the first (and should be the only) admin record
+      });
+    }
+  );
+});
+
 
 module.exports = router;

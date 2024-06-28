@@ -133,7 +133,6 @@ router.post("/Re_upload_paper", (req, res) => {
   let authors = [];
   console.log("paper data", data);
 
-
   // Try to parse the authors' data
   try {
     authors = JSON.parse(data.authors);
@@ -161,7 +160,7 @@ router.post("/Re_upload_paper", (req, res) => {
       data.city,
       data.postalCode,
       data.user_id,
-      paper_id
+      paper_id,
     ],
     (error, result) => {
       if (error) {
@@ -180,10 +179,7 @@ router.post("/Re_upload_paper", (req, res) => {
         [newDate, "user", data.user_id, paper_id],
         (adminError, adminResult) => {
           if (adminError) {
-            console.error(
-              "Error updating admin_paper_relation:",
-              adminError
-            );
+            console.error("Error updating admin_paper_relation:", adminError);
             return res.status(500).json({
               status: false,
               message: "Error updating admin-paper relation",
@@ -209,7 +205,7 @@ router.post("/Re_upload_paper", (req, res) => {
                   contactNumber,
                   email,
                   data.user_id,
-                  author[`authorId${index}`] // Assuming 'authorId' is provided in the author object
+                  author[`authorId${index}`], // Assuming 'authorId' is provided in the author object
                 ],
                 (authorError, authorResult) => {
                   if (authorError) {
@@ -245,10 +241,9 @@ router.post("/Re_upload_paper", (req, res) => {
   );
 });
 
-
 router.post("/reupload_paper", upload.single("file"), (req, res) => {
   const paperId = req.body.paper_id;
-  console.log("abhi ki id h fresh",paperId);
+  console.log("abhi ki id h fresh", paperId);
   const reuploadedFile = req.file;
 
   if (!paperId) {
@@ -798,8 +793,8 @@ router.post("/updateAdminPaperStatus", (req, res) => {
   const paper_id = req.body.paper_id;
   const status = req.body.status;
 
-  console.log("paperid",paper_id)
-  console.log("staus",status)
+  console.log("paperid", paper_id);
+  console.log("staus", status);
 
   if (!paper_id || !status) {
     return res.status(400).json({
