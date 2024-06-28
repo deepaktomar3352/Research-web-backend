@@ -389,4 +389,15 @@ router.post("/user_profile_update", upload.single("userpic"), (req, res) => {
   });
 });
 
+router.get("/user_paper_details", function(req, res) {
+  pool.query("SELECT * FROM paper_submission AS ps INNER JOIN author AS a ON ps.submitted_by=a.user_id",function(err,result) {
+    if (err) {
+      console.log(err);
+    }
+    else{
+      res.status(200).json({status:true,result:result, message:"paper details fetched successfully" });
+    }
+  })
+})
+
 module.exports = router;
