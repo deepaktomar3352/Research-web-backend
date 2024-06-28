@@ -50,10 +50,10 @@ router.post("/viewer_login", function (req, res) {
   const { email, password } = req.body;
   console.log("frontend", email, password);
 
-  // Query the database for the user with the provided email
+  // Query the database for the viewer with the provided email
   pool.query(
-    "SELECT * FROM viewer_registration WHERE email = ? AND password = ?",
-    [email, password], // Check plain text password
+    "SELECT * FROM viewer_registration WHERE email = ?",
+    [email],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -65,27 +65,47 @@ router.post("/viewer_login", function (req, res) {
       }
 
       if (results.length === 0) {
-        // If no user is found with the given email and password
+        // If no viewer is found with the given email
         return res.status(401).json({
           status: false,
           message: "Invalid email or password",
         });
       }
 
-      const user = results[0];
+      const viewer = results[0];
 
-      // If credentials match, the user is successfully authenticated
-      res.status(200).json({
-        status: true,
-        message: "Login successful",
-        viewer: {
-          id: user.id,
-          firstname: user.firstname,
-          lastname: user.lastname,
-          email: user.email,
-          emailupdates: user.emailupdates,
-          userpic: user.userpic,
-        },
+      // Compare the provided password with the stored hashed password
+      bcrypt.compare(password, viewer.password, (compareErr, isMatch) => {
+        if (compareErr) {
+          console.error("Error comparing passwords:", compareErr);
+          return res.status(500).json({
+            status: false,
+            message: "Error during login",
+            error: compareErr.message,
+          });
+        }
+
+        if (isMatch) {
+          // If passwords match, the viewer is successfully authenticated
+          res.status(200).json({
+            status: true,
+            message: "Login successful",
+            viewer: {
+              id: viewer.id,
+              firstname: viewer.firstname,
+              lastname: viewer.lastname,
+              email: viewer.email,
+              emailupdates: viewer.emailupdates,
+              userpic: viewer.userpic,
+            },
+          });
+        } else {
+          // If passwords don't match, send an error response
+          res.status(401).json({
+            status: false,
+            message: "Invalid email or password",
+          });
+        }
       });
     }
   );

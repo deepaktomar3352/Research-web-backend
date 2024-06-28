@@ -690,6 +690,9 @@ router.post("/updateAdminPaperStatus", (req, res) => {
   const  paper_id = req.body.paper_id;
   const status = req.body.status;
 
+  console.log("paperid",paper_id)
+  console.log("staus",status)
+
   if (!paper_id || !status) {
     return res.status(400).json({
       status: false,
