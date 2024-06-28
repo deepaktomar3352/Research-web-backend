@@ -27,26 +27,81 @@ router.post("/uncount_admin_notification", (req, res) => {
     );
   } else if (commentType === "viewer") {
     pool.query(
-        "UPDATE viewer_comments SET status = 0 WHERE CommentID = ?",
-        [CommentID],
-        (err, result) => {
-          if (err) {
-            console.error("Error updating comment status:", err);
-            return;
-          } else {
-            res.status(200).json({
-              status: true,
-              message: "status change successfully",
-              data: result,
-            });
-            console.log("counter", result);
-          }
+      "UPDATE viewer_comments SET status = 0 WHERE CommentID = ?",
+      [CommentID],
+      (err, result) => {
+        if (err) {
+          console.error("Error updating comment status:", err);
+          return;
+        } else {
+          res.status(200).json({
+            status: true,
+            message: "status change successfully",
+            data: result,
+          });
+          console.log("counter", result);
         }
-      );
-
+      }
+    );
   }
-
- 
 });
+
+router.post("/admin_login", function (req, res) {
+  const { email, password } = req.body;
+
+  // Query the database for the user with the provided email
+  pool.query(
+    "SELECT * FROM admin WHERE admin_email = ? AND admin_password = ?",
+    [email, password],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error during SignIn",
+          error: err.sqlMessage,
+        });
+      } else {
+        return res.status(200).json({
+          status: true,
+          message: "Admin SignIn Succesfully",
+          admin: results,
+        });
+      }
+    }
+  );
+});
+router.post("/fetch_admin_profile", function (req, res) {
+  pool.query(
+    "SELECT * FROM admin WHERE id = ?",
+    [req.body.id],
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving admin info",
+          error: err.sqlMessage,
+        });
+      }
+
+      // Check if any admin data was found
+      if (results.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: "Admin not found",
+        });
+      }
+
+      // Return the selected data as JSON
+      res.status(200).json({
+        status: true,
+        message: "Admin info retrieved successfully",
+        data: results[0], // Return the first (and should be the only) admin record
+      });
+    }
+  );
+});
+
 
 module.exports = router;

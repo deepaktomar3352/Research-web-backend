@@ -4,8 +4,8 @@ var pool = mysql.createPool(
         host:'localhost',
         port:'3306',
         user:'root',
-        password:'3352',
-        database:'research_web',
+        password:'mysql@123',
+        database:'researchweb',
         multipleStatements:true,
         connectionLimit:100
     }
