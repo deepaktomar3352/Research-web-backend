@@ -487,7 +487,41 @@ router.get("/user_paper", function (req, res) {
     console.error("error");
   }
 
-  const query = `SELECT * FROM paper_submission AS ps INNER JOIN author AS a ON ps.submitted_by = a.user_id WHERE ps.submitted_by =? `;
+  const query = `SELECT 
+    ps.id AS paper_id,
+    ps.paper_title,
+    ps.research_area,
+    ps.paper_uploaded,
+    ps.mimetype,
+    ps.paper_keywords,
+    ps.paper_abstract,
+    ps.address_line_one,
+    ps.address_line_two,
+    ps.city,
+    ps.postal_code,
+    ps.submitted_by,
+    ps.submission_date,
+    ps.updated_at,
+    ps.paper_status,
+    ps.category,
+    ps.status,
+    ps.reupload_count,
+    a.idauthor AS author_id,
+    a.user_id,
+    a.author_name,
+    a.author_designation,
+    a.author_college,
+    a.author_number,
+    a.author_email
+FROM
+    paper_submission AS ps
+JOIN
+    author AS a ON ps.submitted_by = a.user_id
+WHERE
+    ps.submitted_by = ?
+GROUP BY
+    ps.id, a.user_id;
+ `;
 
   pool.query(query, [userId], (err, results) => {
     if (err) {

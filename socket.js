@@ -81,10 +81,37 @@ function setupSocket(server) {
       }
     });
 
+     // Function to query the database and emit the comment count
+  const checkForNewComments = () => {
+    const query =
+      "SELECT paper_id, COUNT(*) as count FROM Comments WHERE is_admin_comment = 1 AND status = 0 GROUP BY paper_id";
+
+    pool.query(query, (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        socket.emit("error", {
+          status: false,
+          message: "Error retrieving new admin comments",
+          error: err.sqlMessage || err.message,
+        });
+        return;
+      }
+
+      socket.emit("comment_count", results);
+    });
+  };
+
+  // Immediately check for new comments when the user connects
+  checkForNewComments();
+
+  // Set up an interval to check for new comments every 6 seconds
+  const commentCheckInterval = setInterval(checkForNewComments, 6000);
+
     socket.on("disconnect", () => {
       console.log("User disconnected");
     });
   });
+  
 
   // Viewer namespace
   vsp.on("connection", (socket) => {
@@ -238,8 +265,6 @@ function setupSocket(server) {
       });
     };
 
-    
-
     // Call the function to fetch and emit data when an admin connects
     fetchAndEmitData();
 
@@ -262,9 +287,8 @@ function getIo() {
 
 module.exports = { setupSocket, getIo };
 
-
- // Emit the data to the clients
-  //   io.of("/admin-namespace").emit("counter", {
-  //     userCommentCount,
-  //     viewerCommentCount,
-  //   });
+// Emit the data to the clients
+//   io.of("/admin-namespace").emit("counter", {
+//     userCommentCount,
+//     viewerCommentCount,
+//   });
