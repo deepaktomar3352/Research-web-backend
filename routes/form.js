@@ -272,7 +272,6 @@ router.post("/Re_upload_paper", (req, res) => {
   );
 });
 
-
 router.post("/reupload_paper_file", upload.single("file"), (req, res) => {
   const paperId = req.body.paper_id;
   const reuploadedFile = req.file;
@@ -504,7 +503,6 @@ router.get("/user_paper", function (req, res) {
     ps.updated_at,
     ps.paper_status,
     ps.category,
-    ps.status,
     ps.reupload_count,
     a.idauthor AS author_id,
     a.user_id,
