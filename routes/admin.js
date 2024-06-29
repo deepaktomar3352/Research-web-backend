@@ -73,7 +73,7 @@ router.post("/admin_login", function (req, res) {
 });
 router.post("/fetch_admin_profile", function (req, res) {
   pool.query(
-    "SELECT * FROM admin WHERE id = ?",
+    "SELECT * FROM `admin` WHERE id = ?",
     [req.body.id],
     (err, results) => {
       if (err) {
