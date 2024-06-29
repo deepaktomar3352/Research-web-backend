@@ -6,54 +6,52 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
-/*  viewer Register. */
-router.post(  "/viewer_register",  upload.single("userImage"),
-  function (req, res, next) {
-    console.log("name", req.body.firstname);
-    console.log("last", req.body.lastname);
-    console.log("body", req.body.receiveUpdates);
+/* Viewer Register. */
+router.post("/viewer_register", upload.single("userImage"), function (req, res) {
+  console.log("name", req.body.firstname);
+  console.log("last", req.body.lastname);
+  console.log("body", req.body.receiveUpdates);
 
-    // Insert user data into the database
-    pool.query(
-      "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [
-        req.body.firstname,
-        req.body.lastname,
-        req.body.email,
-        req.body.password, // Store plain text password
-        req.body.receiveUpdates,
-        req.file ? req.file.originalname : null,
-        req.body.category,
-      ],
-      (error, result) => {
-        if (error) {
-          console.log("SQL Error:", error);
-          res.status(500).json({
-            status: false,
-            message: "Error during registration",
-            error: error.sqlMessage,
-          });
-        } else {
-          res.status(200).json({
-            status: true,
-            message: "Registered Successfully",
-            result,
-          });
-        }
+  // Insert user data into the database
+  pool.query(
+    "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      req.body.firstname,
+      req.body.lastname,
+      req.body.email,
+      req.body.password, // Store plain text password
+      req.body.receiveUpdates,
+      req.file ? req.file.originalname : null,
+      req.body.category,
+    ],
+    (error, result) => {
+      if (error) {
+        console.log("SQL Error:", error);
+        res.status(500).json({
+          status: false,
+          message: "Error during registration",
+          error: error.sqlMessage,
+        });
+      } else {
+        res.status(200).json({
+          status: true,
+          message: "Registered Successfully",
+          result,
+        });
       }
-    );
-  }
-);
+    }
+  );
+});
 
-/* viewer login. */
+/* Viewer Login. */
 router.post("/viewer_login", function (req, res) {
   const { email, password } = req.body;
   console.log("frontend", email, password);
 
   // Query the database for the viewer with the provided email
   pool.query(
-    "SELECT * FROM viewer_registration WHERE email = ?",
-    [email],
+    "SELECT * FROM viewer_registration WHERE email = ? AND password = ?",
+    [email, password],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -65,7 +63,7 @@ router.post("/viewer_login", function (req, res) {
       }
 
       if (results.length === 0) {
-        // If no viewer is found with the given email
+        // If no viewer is found with the given email and password
         return res.status(401).json({
           status: false,
           message: "Invalid email or password",
@@ -74,38 +72,18 @@ router.post("/viewer_login", function (req, res) {
 
       const viewer = results[0];
 
-      // Compare the provided password with the stored hashed password
-      bcrypt.compare(password, viewer.password, (compareErr, isMatch) => {
-        if (compareErr) {
-          console.error("Error comparing passwords:", compareErr);
-          return res.status(500).json({
-            status: false,
-            message: "Error during login",
-            error: compareErr.message,
-          });
-        }
-
-        if (isMatch) {
-          // If passwords match, the viewer is successfully authenticated
-          res.status(200).json({
-            status: true,
-            message: "Login successful",
-            viewer: {
-              id: viewer.id,
-              firstname: viewer.firstname,
-              lastname: viewer.lastname,
-              email: viewer.email,
-              emailupdates: viewer.emailupdates,
-              userpic: viewer.userpic,
-            },
-          });
-        } else {
-          // If passwords don't match, send an error response
-          res.status(401).json({
-            status: false,
-            message: "Invalid email or password",
-          });
-        }
+      // If credentials match, the viewer is successfully authenticated
+      res.status(200).json({
+        status: true,
+        message: "Login successful",
+        viewer: {
+          id: viewer.id,
+          firstname: viewer.firstname,
+          lastname: viewer.lastname,
+          email: viewer.email,
+          emailupdates: viewer.emailupdates,
+          userpic: viewer.userpic,
+        },
       });
     }
   );
@@ -538,7 +516,7 @@ router.post("/shared_paper_details", (req, res) => {
       // Second query to get paper details from the papersubmission table based on the paper_ids
       pool.query(
         `SELECT 
-          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status,paperupload_status
+          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status,reupload_count
          FROM 
           paper_submission 
          WHERE 

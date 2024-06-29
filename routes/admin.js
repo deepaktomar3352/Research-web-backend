@@ -51,7 +51,7 @@ router.post("/admin_login", function (req, res) {
 
   // Query the database for the user with the provided email
   pool.query(
-    "SELECT * FROM admin WHERE admin_email = ? AND admin_password = ?",
+    "SELECT * FROM `admin` WHERE admin_email = ? AND admin_password = ?",
     [email, password],
     (err, results) => {
       if (err) {

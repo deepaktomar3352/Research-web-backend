@@ -28,7 +28,7 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
 
   // Insert data into `paper_submission`
   pool.query(
-    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, category, address_line_one, address_line_two, city, postal_code, submitted_by,paperupload_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)",
+    "INSERT INTO paper_submission (paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, category, address_line_one, address_line_two, city, postal_code, submitted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)",
     [
       data.paperTitle,
       data.researchArea,
@@ -42,7 +42,6 @@ router.post("/upload_paper", upload.single("uploadPaper"), (req, res) => {
       data.city,
       data.postalCode,
       data.user_id,
-      "uploaded",
     ],
     (error, result) => {
       if (error) {
@@ -273,9 +272,9 @@ router.post("/Re_upload_paper", (req, res) => {
   );
 });
 
-router.post("/reupload_paper", upload.single("file"), (req, res) => {
+
+router.post("/reupload_paper_file", upload.single("file"), (req, res) => {
   const paperId = req.body.paper_id;
-  console.log("abhi ki id h fresh", paperId);
   const reuploadedFile = req.file;
 
   if (!paperId) {
@@ -294,7 +293,7 @@ router.post("/reupload_paper", upload.single("file"), (req, res) => {
 
   // Fetch current reupload_count to determine the status
   pool.query(
-    "SELECT paperupload_status FROM paper_submission WHERE id = ?",
+    "SELECT reupload_count FROM paper_submission WHERE id = ?",
     [paperId],
     (selectError, selectResult) => {
       if (selectError) {
@@ -313,20 +312,22 @@ router.post("/reupload_paper", upload.single("file"), (req, res) => {
         });
       }
 
-      const currentPaperUpload_Status = selectResult[0].paperupload_status;
-      if (currentPaperUpload_Status === "upload") {
-        newStatus = "reuploaded";
-      } else if (currentPaperUpload_Status === "reupload") {
-        newStatus = "last reuploaded";
+      const reuploadCount = selectResult[0].reupload_count || 0;
+
+      if (reuploadCount >= 3) {
+        return res.status(200).json({
+          status: false,
+          message: "Upload limit exceeded. No more uploads allowed.",
+        });
       }
 
-      // Update the paper submission with the new file name, mime type, status, and increment the reupload count
+      // Update the paper submission with the new file name, mime type, and increment the reupload count
       pool.query(
-        "UPDATE paper_submission SET paper_uploaded = ?, mimetype = ?, paperupload_status = ? WHERE id = ?",
+        "UPDATE paper_submission SET paper_uploaded = ?, mimetype = ?, reupload_count = ? WHERE id = ?",
         [
           reuploadedFile.originalname,
           reuploadedFile.mimetype,
-          newStatus,
+          reuploadCount + 1,
           paperId,
         ],
         (updateError, updateResult) => {
@@ -362,7 +363,7 @@ router.get("/paper_requests", function (req, res) {
       ps.mimetype,
       ps.category,
       ps.submission_date,
-      ps.paperupload_status,
+      ps.reupload_count,
       u.id AS user_id,
       u.firstname,
       u.lastname,
