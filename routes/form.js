@@ -504,7 +504,6 @@ router.get("/user_paper", function (req, res) {
     ps.updated_at,
     ps.paper_status,
     ps.category,
-    ps.status,
     ps.reupload_count,
     a.idauthor AS author_id,
     a.user_id,
@@ -583,8 +582,7 @@ router.get("/delete_paper", (req, res) => {
 });
 
 // Create a new article
-router.post(
-  "/submit_article",
+router.post(  "/submit_article",
   upload.single("uploaded_article"),
   (req, res) => {
     const file = req.file;
@@ -785,7 +783,7 @@ router.post("/reset_count", (req, res) => {
   const { paperid } = req.body;
   console.log("resetid", paperid);
   // Update the status for the given paper_id
-  const query = "UPDATE Comments SET status = 1 WHERE paper_id = ?";
+  const query = "UPDATE Comments SET status = 1 WHERE paper_id = ? AND is_admin_comment = 1 AND status = 0";
   const queryParams = [paperid];
 
   pool.query(query, queryParams, (err, results) => {

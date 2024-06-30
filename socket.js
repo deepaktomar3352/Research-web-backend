@@ -56,8 +56,8 @@ function setupSocket(server) {
             : "INSERT INTO Comments (UserId, content, is_admin_comment, target_user_id, paper_id, status) VALUES (?, ?, ?, ?, ?, 0)";
         const params =
           user === "user"
-            ? [user_id, comment, is_admin_comment, paper_id]
-            : [user_id, comment, is_admin_comment, user_id, paper_id];
+            ? [user_id, comment, 0, paper_id]
+            : [user_id, comment, 1, user_id, paper_id];
 
         await new Promise((resolve, reject) => {
           pool.query(query, params, (err, result) => {
@@ -147,15 +147,15 @@ function setupSocket(server) {
 
     socket.on("new_comment", async (data) => {
       try {
-        const { viewer_id, is_admin_comment, comment, paper_id, user } = data;
+        const { viewer_id, comment, paper_id, user } = data;
         const query =
           user === "viewer"
             ? "INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, paper_id, status) VALUES (?, ?, ?, ?, 1)"
             : "INSERT INTO viewer_comments (viewer_id, content, is_admin_comment, target_viewer_id, paper_id, status) VALUES (?, ?, ?, ?, ?, 0)";
         const params =
           user === "viewer"
-            ? [viewer_id, comment, is_admin_comment, paper_id]
-            : [viewer_id, comment, is_admin_comment, viewer_id, paper_id];
+            ? [viewer_id, comment, 0, paper_id]
+            : [viewer_id, comment, 1, viewer_id, paper_id];
 
         await new Promise((resolve, reject) => {
           pool.query(query, params, (err, result) => {
