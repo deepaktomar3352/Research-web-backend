@@ -361,6 +361,7 @@ router.get("/paper_requests", function (req, res) {
       ps.paper_uploaded,
       ps.mimetype,
       ps.category,
+      ps.paper_status,
       ps.submission_date,
       ps.reupload_count,
       u.id AS user_id,
@@ -516,7 +517,7 @@ FROM
 JOIN
     author AS a ON ps.submitted_by = a.user_id
 WHERE
-    ps.submitted_by = ?
+    ps.submitted_by = ? AND ps.paper_status = 'pending'
 GROUP BY
     ps.id, a.user_id;
  `;
@@ -636,17 +637,26 @@ router.post(
 );
 
 // Get article by ID
-router.get("/user_articles", (req, res) => {
-  const { articleId } = req.query;
-  console.log(articleId);
-  const query = "SELECT * FROM article_submission WHERE submitted_by = ?";
+router.post("/fetchAccording_To_Paper_Status", (req, res) => {
+  const user_id = req.body.user_id;
+  const paper_status = req.body.paper_status;
 
-  pool.query(query, [articleId], (err, result) => {
+  // Input validation
+  if (!user_id) {
+    return res.status(400).json({
+      status: false,
+      message: "User ID is required",
+    });
+  }
+
+  const query = "SELECT * FROM paper_submission WHERE submitted_by = ? AND paper_status = ?";
+
+  pool.query(query, [user_id,paper_status], (err, result) => {
     if (err) {
       console.error("Database error:", err);
       return res.status(500).json({
         status: false,
-        message: "Error retrieving article",
+        message: "Error retrieving articles",
         error: err.sqlMessage || err.message,
       });
     }
@@ -654,17 +664,18 @@ router.get("/user_articles", (req, res) => {
     if (result.length === 0) {
       return res.status(404).json({
         status: false,
-        message: `Article with ID ${articleId} not found`,
+        message: `No accepted papers found for user with ID ${user_id}`,
       });
     }
 
     res.status(200).json({
       status: true,
-      message: "Article retrieved successfully",
-      article: result, // The first result, since ID is unique
+      message: "Articles retrieved successfully",
+      papers: result,
     });
   });
 });
+
 
 router.get("/delete_article", (req, res) => {
   const articleId = req.query.id;
@@ -897,5 +908,7 @@ router.post("/updateAdminPaperStatus", (req, res) => {
     }
   );
 });
+
+
 
 module.exports = router;
