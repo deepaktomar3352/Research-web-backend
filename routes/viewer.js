@@ -213,7 +213,7 @@ router.get("/viewer_info", function (req, res) {
 });
 // fetch viewers details from sharedviewers table
 router.post("/selectedviewer_info", function (req, res) {
-  const paperId = req.body.paperId; // Access paperId from request body
+  const paperId = req.body.paper_id; // Access paperId from request body
 
   console.log("Paper ID:", paperId);
 
