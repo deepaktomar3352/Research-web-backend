@@ -7,41 +7,45 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 /* Viewer Register. */
-router.post("/viewer_register", upload.single("userImage"), function (req, res) {
-  console.log("name", req.body.firstname);
-  console.log("last", req.body.lastname);
-  console.log("body", req.body.receiveUpdates);
+router.post(
+  "/viewer_register",
+  upload.single("userImage"),
+  function (req, res) {
+    console.log("name", req.body.firstname);
+    console.log("last", req.body.lastname);
+    console.log("body", req.body.receiveUpdates);
 
-  // Insert user data into the database
-  pool.query(
-    "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [
-      req.body.firstname,
-      req.body.lastname,
-      req.body.email,
-      req.body.password, // Store plain text password
-      req.body.receiveUpdates,
-      req.file ? req.file.originalname : null,
-      req.body.category,
-    ],
-    (error, result) => {
-      if (error) {
-        console.log("SQL Error:", error);
-        res.status(500).json({
-          status: false,
-          message: "Error during registration",
-          error: error.sqlMessage,
-        });
-      } else {
-        res.status(200).json({
-          status: true,
-          message: "Registered Successfully",
-          result,
-        });
+    // Insert user data into the database
+    pool.query(
+      "INSERT INTO viewer_registration (firstname, lastname, email, password, emailupdates, userpic, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [
+        req.body.firstname,
+        req.body.lastname,
+        req.body.email,
+        req.body.password, // Store plain text password
+        req.body.receiveUpdates,
+        req.file ? req.file.originalname : null,
+        req.body.category,
+      ],
+      (error, result) => {
+        if (error) {
+          console.log("SQL Error:", error);
+          res.status(500).json({
+            status: false,
+            message: "Error during registration",
+            error: error.sqlMessage,
+          });
+        } else {
+          res.status(200).json({
+            status: true,
+            message: "Registered Successfully",
+            result,
+          });
+        }
       }
-    }
-  );
-});
+    );
+  }
+);
 
 /* Viewer Login. */
 router.post("/viewer_login", function (req, res) {
@@ -117,7 +121,8 @@ router.post("/viewerData_update", function (req, res) {
       message: "No data provided for update",
     });
   }
-  const { firstname, lastname, email,password, category, userpic } = updatedData;
+  const { firstname, lastname, email, password, category, userpic } =
+    updatedData;
 
   if (!firstname || !lastname || !email || !password || !category || !userpic) {
     return res.status(400).json({
@@ -128,7 +133,7 @@ router.post("/viewerData_update", function (req, res) {
 
   pool.query(
     "UPDATE viewer_registration SET firstname = ?, lastname = ?, email = ?,password=?, category = ?, userpic = ? WHERE id = ?",
-    [firstname, lastname, email,password, category, userpic, id],
+    [firstname, lastname, email, password, category, userpic, id],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -392,8 +397,8 @@ router.get("/viewer_paper_data", (req, res) => {
 router.post("/remove_viewer_id_from_sharedviewer_table", (req, res) => {
   const viewer_id = req.body.viewers_id;
   const paper_id = req.body.paper_id;
-  console.log("viewer id",viewer_id)
-  console.log("paper id",paper_id)
+  console.log("viewer id", viewer_id);
+  console.log("paper id", paper_id);
 
   if (!viewer_id || !paper_id) {
     return res.status(400).json({
@@ -800,5 +805,49 @@ router.post("/send_admin_comment", (req, res) => {
   );
 });
 ``;
+
+router.post("/updateViewer_Profile", upload.single("file"), function (req, res) {
+  const id = req.body.id;
+  const userpic = req.file ? req.file.originalname : null;
+  console.log("id",id)
+  console.log("userpic",userpic)
+
+  if (!id) {
+    return res.status(400).json({
+      status: false,
+      message: "Missing required field: id",
+    });
+  }
+
+  if (!userpic) {
+    return res.status(400).json({
+      status: false,
+      message: "File upload failed or missing required field: file",
+    });
+  }
+
+  // Update user data in the database
+  pool.query(
+    "UPDATE viewer_registration SET userpic = ? WHERE id = ?",
+    [userpic, id],
+    (error, result) => {
+      if (error) {
+        console.error("SQL Error:", error);
+        return res.status(500).json({
+          status: false,
+          message: "Error updating profile",
+          error: error.sqlMessage,
+        });
+      }
+
+      res.status(200).json({
+        status: true,
+        message: "Profile updated successfully",
+        result,
+      });
+    }
+  );
+});
+
 
 module.exports = router;
