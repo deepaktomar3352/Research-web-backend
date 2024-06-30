@@ -15,32 +15,46 @@ function setupSocket(server) {
   const usp = io.of("/user-namespace");
   const vsp = io.of("/viewer-namespace");
   const adminNamespace = io.of("/admin-namespace");
-  // User namespace
+  //**************** */ User namespace************************************************
   usp.on("connection", (socket) => {
     console.log("User connected");
+    
 
     socket.on("fetch_comments", async ({ user_id, paper_id, user }) => {
       try {
         let query, queryParams;
-        if (user === "user") {
-          query = paper_id
-            ? "SELECT * FROM Comments WHERE paper_id = ?"
-            : "SELECT * FROM Comments WHERE userId = ?";
-          queryParams = [paper_id || user_id];
-        } else if (user === "admin") {
-          query = paper_id
-            ? "SELECT * FROM Comments WHERE paper_id = ?"
-            : "SELECT * FROM Comments WHERE userId = ?";
-          queryParams = [paper_id || user_id];
-        }
 
-        const comments = await new Promise((resolve, reject) => {
-          pool.query(query, queryParams, (err, results) => {
-            if (err) reject(err);
-            else resolve(results);
-          });
-        });
-        socket.emit("comments", comments);
+        // Fetch comments for a specific paper of the user
+        query = "SELECT * FROM Comments WHERE paper_id = ? AND userId = ?";
+        queryParams = [paper_id, user_id];
+
+        const fetchComments = async () => {
+          try {
+            const comments = await new Promise((resolve, reject) => {
+              pool.query(query, queryParams, (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+              });
+            });
+    
+            socket.emit("comments", comments);
+          } catch (error) {
+            console.error("Database error:", error);
+            socket.emit("error", "Failed to retrieve comments");
+          }
+        };
+
+           // Call fetchComments immediately
+           await fetchComments();
+    
+           // Poll for new comments every second
+           const interval = setInterval(fetchComments, 100);
+       
+           // Stop polling if socket disconnects
+           socket.on("disconnect", () => {
+             clearInterval(interval);
+           });
+
       } catch (error) {
         console.error("Database error:", error);
         socket.emit("error", "Failed to retrieve comments");
@@ -49,15 +63,11 @@ function setupSocket(server) {
 
     socket.on("new_comment", async (data) => {
       try {
-        const { user_id, is_admin_comment, comment, paper_id, user } = data;
-        const query =
-          user === "user"
-            ? "INSERT INTO Comments (UserId, content, is_admin_comment, paper_id, status) VALUES (?, ?, ?, ?, 1)"
-            : "INSERT INTO Comments (UserId, content, is_admin_comment, target_user_id, paper_id, status) VALUES (?, ?, ?, ?, ?, 0)";
-        const params =
-          user === "user"
-            ? [user_id, comment, 0, paper_id]
-            : [user_id, comment, 1, user_id, paper_id];
+        const { user_id, comment, paper_id } = data;
+        let query, params;
+        query =
+          "INSERT INTO Comments (UserId, content, is_admin_comment, paper_id, status) VALUES (?, ?, ?, ?, 1)";
+        params = [user_id, comment, 0, paper_id];
 
         await new Promise((resolve, reject) => {
           pool.query(query, params, (err, result) => {
@@ -81,39 +91,62 @@ function setupSocket(server) {
       }
     });
 
-     // Function to query the database and emit the comment count
-  const checkForNewComments = () => {
-    const query =
-      "SELECT paper_id, COUNT(*) as count FROM Comments WHERE is_admin_comment = 1 AND status = 0 GROUP BY paper_id";
+    // Function to query the database and emit the comment count
+    const checkForNewComments = () => {
+      const query =
+        "SELECT paper_id, COUNT(*) as count FROM Comments WHERE is_admin_comment = 1 AND status = 0 GROUP BY paper_id";
 
-    pool.query(query, (err, results) => {
-      if (err) {
-        console.error("Database error:", err);
-        socket.emit("error", {
-          status: false,
-          message: "Error retrieving new admin comments",
-          error: err.sqlMessage || err.message,
-        });
-        return;
-      }
+      pool.query(query, (err, results) => {
+        if (err) {
+          console.error("Database error:", err);
+          socket.emit("error", {
+            status: false,
+            message: "Error retrieving new admin comments",
+            error: err.sqlMessage || err.message,
+          });
+          return;
+        }
 
-      socket.emit("comment_count", results);
+        socket.emit("comment_count", results);
+      });
+    };
+
+    // Immediately check for new comments when the user connects
+    checkForNewComments();
+
+    // Set up an interval to check for new comments every second
+    const commentCheckInterval = setInterval(checkForNewComments, 1000);
+
+    socket.on("user_reset_comment_count", (data) => {
+      console.log("reset comment count id", data);
+      const query =
+        "UPDATE Comments SET status = 1 WHERE paper_id = ? AND is_admin_comment = 1 AND status = 0";
+      const queryParams = [data];
+
+      pool.query(query, queryParams, (err, results) => {
+        if (err) {
+          console.error("Database error:", err);
+          return res.status(500).json({
+            status: false,
+            message: "Error updating comment status",
+            error: err.sqlMessage || err.message,
+          });
+        }
+
+        // Emit the update confirmation if needed
+        socket.emit("user_comment_count", results);
+
+        // After updating the status, immediately check for new comments and emit the count
+        checkForNewComments();
+      });
     });
-  };
-
-  // Immediately check for new comments when the user connects
-  checkForNewComments();
-
-  // Set up an interval to check for new comments every 6 seconds
-  const commentCheckInterval = setInterval(checkForNewComments, 6000);
 
     socket.on("disconnect", () => {
       console.log("User disconnected");
     });
   });
-  
 
-  // Viewer namespace
+  //************ */ Viewer namespace***************************************************
   vsp.on("connection", (socket) => {
     console.log("Viewer connected");
 
@@ -194,26 +227,27 @@ function setupSocket(server) {
                     SELECT c.CommentID,c.status, c.paper_id, u.id, u.firstname, u.lastname, u.userpic, c.content, c.created_at, 'user' AS commentType
                     FROM comments c
                     JOIN user_registration u ON c.UserId = u.id
-                    WHERE c.is_admin_comment = 0 OR c.status = 1
+                    WHERE c.is_admin_comment = 0 
                 `;
 
       const sqlViewerComments = `
                     SELECT vc.CommentID,vc.status, vc.paper_id, v.id, v.firstname AS viewerName, v.lastname AS lastName, v.userpic, vc.content, vc.created_at, 'viewer' AS commentType
                     FROM viewer_comments vc
                     JOIN viewer_registration v ON vc.viewer_id = v.id
-                    WHERE vc.is_admin_comment = 0 OR vc.status = 1
+                    WHERE vc.is_admin_comment = 0 
                 `;
 
       const sqlUserCommentCount = `
                     SELECT COUNT(*) AS userCommentCount 
                     FROM comments 
-                    WHERE status = 1
+                    WHERE is_admin_comment =0 AND status = 1
                 `;
 
+                
       const sqlViewerCommentCount = `
                     SELECT COUNT(*) AS viewerCommentCount 
                     FROM viewer_comments 
-                    WHERE status = 1
+                    WHERE is_admin_comment =0 AND status = 1
                 `;
 
       pool.query(sqlUserComments, (err, userComments) => {
@@ -254,7 +288,7 @@ function setupSocket(server) {
                 });
 
                 // Optionally emit the full comments data
-                adminNamespace.emit("comments", {
+                adminNamespace.emit("new_comments", {
                   userComments,
                   viewerComments,
                 });
@@ -268,8 +302,90 @@ function setupSocket(server) {
     // Call the function to fetch and emit data when an admin connects
     fetchAndEmitData();
 
-    // You can set up an interval to periodically fetch and emit data
+    // // You can set up an interval to periodically fetch and emit dat
     const interval = setInterval(fetchAndEmitData, 600); // Every 6 seconds
+
+    socket.on("fetch_comments", async ({ user_id, paper_id }) => {
+      try {
+        let query, queryParams;
+        // Admin fetches comments for a specific paper of a specific user
+        query = "SELECT * FROM Comments WHERE paper_id = ? AND userId = ?";
+        queryParams = [paper_id, user_id];
+    
+        const fetchComments = async () => {
+          try {
+            const comments = await new Promise((resolve, reject) => {
+              pool.query(query, queryParams, (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+              });
+            });
+    
+            socket.emit("comments", comments);
+          } catch (error) {
+            console.error("Database error:", error);
+            socket.emit("error", "Failed to retrieve comments");
+          }
+        };
+    
+        // Call fetchComments immediately
+        await fetchComments();
+    
+        // Poll for new comments every second
+        const interval = setInterval(fetchComments, 100);
+    
+        // Stop polling if socket disconnects
+        socket.on("disconnect", () => {
+          clearInterval(interval);
+        });
+    
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        socket.emit("error", "Failed to retrieve comments");
+      }
+    });
+    
+
+    socket.on("new_comment", async (data) => {
+      try {
+        const { user_id, comment, paper_id } = data;
+        let query, params;
+        query =
+          "INSERT INTO Comments (UserId, content, is_admin_comment, target_user_id, paper_id, status) VALUES (?, ?, ?, ?, ?, 0)";
+        params = [user_id, comment, 1, user_id, paper_id];
+
+        await new Promise((resolve, reject) => {
+          pool.query(query, params, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        });
+
+        const selectQuery = "SELECT * FROM Comments WHERE paper_id = ?";
+        const comments = await new Promise((resolve, reject) => {
+          pool.query(selectQuery, [paper_id], (err, response) => {
+            if (err) reject(err);
+            else resolve(response);
+          });
+        });
+
+        adminNamespace.emit("comments", comments);
+      } catch (error) {
+        console.error("Error inserting or retrieving comments:", error);
+        socket.emit("error", "Failed to insert or retrieve comments");
+      }
+    });
+
+
+    socket.on("uncount_admin_notification",(data)=>{
+      console.log("data",data.CommentID);
+      pool.query(
+        "UPDATE Comments SET status = 0 WHERE CommentID = ? AND is_admin_comment = 0 AND status = 1",[data.CommentID],(err, result) => {
+          if (err) console.log(err);
+          // else console.log(result);
+        }
+      );
+    })
 
     socket.on("disconnect", () => {
       console.log("Admin disconnected");

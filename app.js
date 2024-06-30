@@ -6,8 +6,6 @@ const logger = require("morgan");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
-const socketIO = require("socket.io");
-const pool = require("./routes/pool");
 
 const { setupSocket } = require("./socket");
 const adminRouter = require("./routes/admin");
