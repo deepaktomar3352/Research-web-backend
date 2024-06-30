@@ -521,7 +521,7 @@ router.post("/shared_paper_details", (req, res) => {
       // Second query to get paper details from the papersubmission table based on the paper_ids
       pool.query(
         `SELECT 
-          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category, status,reupload_count
+          id, paper_title, research_area, paper_uploaded, mimetype, paper_keywords, paper_abstract, address_line_one, address_line_two, city, postal_code, submitted_by, submission_date, updated_at, paper_status, category,reupload_count
          FROM 
           paper_submission 
          WHERE 
