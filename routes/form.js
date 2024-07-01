@@ -354,33 +354,35 @@ router.post("/reupload_paper_file", upload.single("file"), (req, res) => {
 router.get("/paper_requests", function (req, res) {
   // SQL query to fetch paper submissions along with user info based on user_id from admin_paper_relation
   const query = `
-    SELECT 
-      ps.id AS paper_id,
-      ps.paper_title,
-      ps.research_area,
-      ps.paper_uploaded,
-      ps.mimetype,
-      ps.category,
-      ps.paper_status,
-      ps.submission_date,
-      ps.reupload_count,
-      u.id AS user_id,
-      u.firstname,
-      u.lastname,
-      u.userpic,
-      apr.sharedat,
-      apr.sharedby
-    FROM 
-      admin_paper_relation apr
-    JOIN 
-      paper_submission ps
-    ON 
-      apr.paper_id = ps.id
-    JOIN 
-      user_registration u
-    ON 
-      apr.user_id = u.id
-  `;
+   SELECT 
+  ps.id AS paper_id,
+  ps.paper_title,
+  ps.research_area,
+  ps.paper_uploaded,
+  ps.mimetype,
+  ps.category,
+  ps.paper_status,
+  ps.submission_date,
+  ps.reupload_count,
+  u.id AS user_id,
+  u.firstname,
+  u.lastname,
+  u.userpic,
+  apr.sharedat,
+  apr.sharedby
+FROM 
+  admin_paper_relation apr
+JOIN 
+  paper_submission ps
+ON 
+  apr.paper_id = ps.id
+JOIN 
+  user_registration u
+ON 
+  apr.user_id = u.id
+WHERE 
+  ps.paper_status = 'pending';
+ `;
 
   // Execute the query
   pool.query(query, (err, results) => {
@@ -402,82 +404,6 @@ router.get("/paper_requests", function (req, res) {
   });
 });
 
-// DELETE endpoint to remove a record from admin_paper_relation by paper_id
-router.post("/deleteAdmin_paper", (req, res) => {
-  const paper_id = req.body.paper_id;
-
-  const deleteCommentsQuery = "DELETE FROM comments WHERE paper_id = ?";
-  const deleteViewersCommentsQuery =
-    "DELETE FROM viewer_comments WHERE paper_id = ?";
-  const deleteAdminPaperQuery = "DELETE FROM paper_submission WHERE id = ?";
-  const deletePaperFrom_AdminRelationTableQuery =
-    "DELETE FROM admin_paper_relation WHERE paper_id = ?";
-
-  // Deleting comments
-  pool.query(deleteCommentsQuery, [paper_id], (error, results) => {
-    if (error) {
-      console.error("Database error:", error);
-      return res.status(500).json({
-        status: false,
-        message: "Error deleting comments",
-        error: error.sqlMessage || error.message,
-      });
-    }
-
-    // Deleting viewers comments
-    pool.query(deleteViewersCommentsQuery, [paper_id], (error, results) => {
-      if (error) {
-        console.error("Database error:", error);
-        return res.status(500).json({
-          status: false,
-          message: "Error deleting viewers comments",
-          error: error.sqlMessage || error.message,
-        });
-      }
-
-      // Deleting admin-paper relation
-      pool.query(deleteAdminPaperQuery, [paper_id], (error, results) => {
-        if (error) {
-          console.error("Database error:", error);
-          return res.status(500).json({
-            status: false,
-            message: "Error deleting admin-paper relation",
-            error: error.sqlMessage || error.message,
-          });
-        }
-        pool.query(
-          deletePaperFrom_AdminRelationTableQuery,
-          [paper_id],
-          (error, results) => {
-            if (error) {
-              console.error("Database error:", error);
-              return res.status(500).json({
-                status: false,
-                message: "Error deleting admin-paper relation",
-                error: error.sqlMessage || error.message,
-              });
-            }
-
-            if (results.affectedRows === 0) {
-              // If no rows were deleted, the paper_id was not found
-              return res.status(404).json({
-                status: false,
-                message:
-                  "No admin-paper relation found with the given paper_id",
-              });
-            }
-
-            res.status(200).json({
-              status: true,
-              message:
-                "Admin-paper relation and associated comments deleted successfully",
-            });
-          }
-        );
-      });
-    });
-  });
-});
 
 // Endpoint to fetch papers by user_id
 router.get("/user_paper", function (req, res) {
@@ -865,49 +791,7 @@ router.post("/send_admin_comment", (req, res) => {
   );
 });
 
-router.post("/updateAdminPaperStatus", (req, res) => {
-  const paper_id = req.body.paper_id;
-  const status = req.body.status;
 
-  console.log("paperid", paper_id);
-  console.log("staus", status);
-
-  if (!paper_id || !status) {
-    return res.status(400).json({
-      status: false,
-      message: "Both paper_id and status are required",
-    });
-  }
-
-  // Update the database
-  pool.query(
-    `UPDATE paper_submission SET paper_status = ? WHERE id = ?`,
-    [status, paper_id],
-    (error, result) => {
-      if (error) {
-        console.error("SQL Error:", error);
-        return res.status(500).json({
-          status: false,
-          message: "Error during status update",
-          error: error.sqlMessage,
-        });
-      } else {
-        if (result.affectedRows > 0) {
-          return res.status(200).json({
-            status: true,
-            message: "Paper status updated successfully",
-            result: result,
-          });
-        } else {
-          return res.status(404).json({
-            status: false,
-            message: "Paper not found",
-          });
-        }
-      }
-    }
-  );
-});
 
 
 

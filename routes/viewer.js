@@ -525,7 +525,7 @@ router.post("/shared_paper_details", (req, res) => {
          FROM 
           paper_submission 
          WHERE 
-          id IN (?)`,
+          id IN (?) AND paper_status = 'pending'`,
         [paperIds],
         (error, paperResults) => {
           if (error) {
@@ -847,6 +847,78 @@ router.post("/updateViewer_Profile", upload.single("file"), function (req, res) 
       });
     }
   );
+});
+
+router.post("/fetchPaper_by_Status", async (req, res) => {
+  const viewer_id= req.body.viewer_id;
+  const paper_status = req.body.paper_status;
+  // Input validation
+  if (!paper_status) {
+    return res.status(400).json({
+      status: false,
+      message: "Paper status is required",
+    });
+  }
+  if (!viewer_id) {
+    return res.status(400).json({
+      status: false,
+      message: "Viewer ID is required",
+    });
+  }
+
+  try {
+    // Fetch papers with the specified status
+    const paperQuery = "SELECT DISTINCT * FROM sharedpaper_viewers WHERE viewers_id = ?";
+    pool.query(paperQuery, [viewer_id], async (err, Result) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error retrieving articles",
+          error: err.sqlMessage || err.message,
+        });
+      }
+
+
+      if (Result.length === 0) {
+        return res.status(404).json({
+          status: false,
+          message: `No papers found with status '${paper_status}'`,
+        });
+      }
+
+      const paperIds = [
+        ...new Set(Result.map((data) => data.paper_id)),
+      ];
+
+      // Fetch user data for the extracted user IDs
+      const userQuery = "SELECT * FROM paper_submission WHERE id IN (?) AND paper_status=?";
+      pool.query(userQuery, [paperIds,paper_status], (err, paperResult) => {
+        if (err) {
+          console.error("Database error:", err);
+          return res.status(500).json({
+            status: false,
+            message: "Error retrieving user data",
+            error: err.sqlMessage || err.message,
+          });
+        }
+
+        // Return the retrieved data
+        res.status(200).json({
+          status: true,
+          message: "Papers and user data retrieved successfully",
+          papers: paperResult,
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Unexpected error retrieving paper",
+      error: error.message,
+    });
+  }
 });
 
 
