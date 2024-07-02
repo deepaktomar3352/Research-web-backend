@@ -6,8 +6,6 @@ const logger = require("morgan");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
-const socketIO = require("socket.io");
-const pool = require("./routes/pool");
 
 const { setupSocket } = require("./socket");
 const adminRouter = require("./routes/admin");
@@ -16,6 +14,7 @@ const viewerRouter = require("./routes/viewer");
 const userForm = require("./routes/form");
 
 const app = express();
+app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 // Socket.IO setup
 const server = http.createServer(app);
@@ -59,7 +58,7 @@ app.use(function (err, req, res, next) {
 });
 
 server.listen(5000, () => {
-  console.log("Server listening on port 5000");
+  console.log("Server listening on port",5000);
 });
 
 module.exports = app;

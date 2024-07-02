@@ -508,8 +508,7 @@ router.get("/delete_paper", (req, res) => {
 });
 
 // Create a new article
-router.post(
-  "/submit_article",
+router.post(  "/submit_article",
   upload.single("uploaded_article"),
   (req, res) => {
     const file = req.file;
@@ -633,34 +632,34 @@ router.get("/delete_article", (req, res) => {
 });
 
 // save comments in table
-router.post("/send_comment", (req, res) => {
-  console.log("Body:", req.body);
+// router.post("/send_comment", (req, res) => {
+//   console.log("Body:", req.body);
 
-  const { user_id, is_admin_comment, comment, paper_id } = req.body;
+//   const { user_id, is_admin_comment, comment, paper_id } = req.body;
 
-  const query = `INSERT INTO Comments (UserId, content,is_admin_comment,paper_id) VALUES (?, ?, ?,?)  `;
+//   const query = `INSERT INTO Comments (UserId, content,is_admin_comment,paper_id) VALUES (?, ?, ?,?)  `;
 
-  pool.query(
-    query,
-    [user_id, comment, is_admin_comment, paper_id],
-    (err, result) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).json({
-          status: false,
-          message: "Error submitting comment",
-          error: err.sqlMessage || err.message,
-        });
-      }
+//   pool.query(
+//     query,
+//     [user_id, comment, is_admin_comment, paper_id],
+//     (err, result) => {
+//       if (err) {
+//         console.error("Database error:", err);
+//         return res.status(500).json({
+//           status: false,
+//           message: "Error submitting comment",
+//           error: err.sqlMessage || err.message,
+//         });
+//       }
 
-      res.status(200).json({
-        status: true,
-        message: "Comment submitted successfully",
-        data: result,
-      });
-    }
-  );
-});
+//       res.status(200).json({
+//         status: true,
+//         message: "Comment submitted successfully",
+//         data: result,
+//       });
+//     }
+//   );
+// });
 
 //fetching user comments
 router.get("/user_comment", (req, res) => {
@@ -720,7 +719,7 @@ router.post("/reset_count", (req, res) => {
   const { paperid } = req.body;
   console.log("resetid", paperid);
   // Update the status for the given paper_id
-  const query = "UPDATE Comments SET status = 1 WHERE paper_id = ?";
+  const query = "UPDATE Comments SET status = 1 WHERE paper_id = ? AND is_admin_comment = 1 AND status = 0";
   const queryParams = [paperid];
 
   pool.query(query, queryParams, (err, results) => {

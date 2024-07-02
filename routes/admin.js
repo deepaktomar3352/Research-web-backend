@@ -9,7 +9,7 @@ router.post("/uncount_admin_notification", (req, res) => {
   console.log("req.body:", req.body); // Log the entire req.body to check its structure
   if (commentType === "user") {
     pool.query(
-      "UPDATE comments SET status = 0 WHERE CommentID = ?",
+      "UPDATE Comments SET status = 0 WHERE CommentID = ? AND is_admin_comment = 0 AND status = 1",
       [CommentID],
       (err, result) => {
         if (err) {
