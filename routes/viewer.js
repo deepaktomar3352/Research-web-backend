@@ -213,18 +213,15 @@ router.get("/viewer_info", function (req, res) {
 });
 // fetch viewers details from sharedviewers table
 router.post("/selectedviewer_info", function (req, res) {
-  const paperId = req.body.paper_id; // Access paperId from request body
+  const paper_id = req.body;
+  console.log("Paper ID:", paper_id);
 
-  console.log("Paper ID:", paperId);
-
+  if (!paper_id) {
+    return res.status(400).json({ message: "Paper ID is required" });
+  }
   pool.query(
-    `SELECT 
-       viewers_id
-     FROM 
-       sharedpaper_viewers 
-     WHERE 
-       paper_id = ?`,
-    [paperId],
+    `SELECT viewers_id FROM sharedpaper_viewers  WHERE paper_id = ?`,
+    [paper_id],
     (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -234,7 +231,7 @@ router.post("/selectedviewer_info", function (req, res) {
           error: err.sqlMessage,
         });
       }
-
+      console.log("result",results);
       if (results.length === 0) {
         return res.status(404).json({
           status: false,
@@ -278,6 +275,7 @@ router.post("/selectedviewer_info", function (req, res) {
     }
   );
 });
+
 // insert viewers and paper id in sharedviewers table
 router.post("/sharedPaper_viewers", (req, res) => {
   const { paper_id, viewer_id, sharedat, sharedby } = req.body;
@@ -806,51 +804,55 @@ router.post("/send_admin_comment", (req, res) => {
 });
 ``;
 
-router.post("/updateViewer_Profile", upload.single("file"), function (req, res) {
-  const id = req.body.id;
-  const userpic = req.file ? req.file.originalname : null;
-  console.log("id",id)
-  console.log("userpic",userpic)
+router.post(
+  "/updateViewer_Profile",
+  upload.single("file"),
+  function (req, res) {
+    const id = req.body.id;
+    const userpic = req.file ? req.file.originalname : null;
+    console.log("id", id);
+    console.log("userpic", userpic);
 
-  if (!id) {
-    return res.status(400).json({
-      status: false,
-      message: "Missing required field: id",
-    });
-  }
-
-  if (!userpic) {
-    return res.status(400).json({
-      status: false,
-      message: "File upload failed or missing required field: file",
-    });
-  }
-
-  // Update user data in the database
-  pool.query(
-    "UPDATE viewer_registration SET userpic = ? WHERE id = ?",
-    [userpic, id],
-    (error, result) => {
-      if (error) {
-        console.error("SQL Error:", error);
-        return res.status(500).json({
-          status: false,
-          message: "Error updating profile",
-          error: error.sqlMessage,
-        });
-      }
-
-      res.status(200).json({
-        status: true,
-        message: "Profile updated successfully",
-        result,
+    if (!id) {
+      return res.status(400).json({
+        status: false,
+        message: "Missing required field: id",
       });
     }
-  );
-});
+
+    if (!userpic) {
+      return res.status(400).json({
+        status: false,
+        message: "File upload failed or missing required field: file",
+      });
+    }
+
+    // Update user data in the database
+    pool.query(
+      "UPDATE viewer_registration SET userpic = ? WHERE id = ?",
+      [userpic, id],
+      (error, result) => {
+        if (error) {
+          console.error("SQL Error:", error);
+          return res.status(500).json({
+            status: false,
+            message: "Error updating profile",
+            error: error.sqlMessage,
+          });
+        }
+
+        res.status(200).json({
+          status: true,
+          message: "Profile updated successfully",
+          result,
+        });
+      }
+    );
+  }
+);
 
 router.post("/fetchPaper_by_Status", async (req, res) => {
-  const viewer_id= req.body.viewer_id;
+  const viewer_id = req.body.viewer_id;
   const paper_status = req.body.paper_status;
   // Input validation
   if (!paper_status) {
@@ -868,7 +870,8 @@ router.post("/fetchPaper_by_Status", async (req, res) => {
 
   try {
     // Fetch papers with the specified status
-    const paperQuery = "SELECT DISTINCT * FROM sharedpaper_viewers WHERE viewers_id = ?";
+    const paperQuery =
+      "SELECT DISTINCT * FROM sharedpaper_viewers WHERE viewers_id = ?";
     pool.query(paperQuery, [viewer_id], async (err, Result) => {
       if (err) {
         console.error("Database error:", err);
@@ -879,7 +882,6 @@ router.post("/fetchPaper_by_Status", async (req, res) => {
         });
       }
 
-
       if (Result.length === 0) {
         return res.status(404).json({
           status: false,
@@ -887,13 +889,12 @@ router.post("/fetchPaper_by_Status", async (req, res) => {
         });
       }
 
-      const paperIds = [
-        ...new Set(Result.map((data) => data.paper_id)),
-      ];
+      const paperIds = [...new Set(Result.map((data) => data.paper_id))];
 
       // Fetch user data for the extracted user IDs
-      const userQuery = "SELECT * FROM paper_submission WHERE id IN (?) AND paper_status=?";
-      pool.query(userQuery, [paperIds,paper_status], (err, paperResult) => {
+      const userQuery =
+        "SELECT * FROM paper_submission WHERE id IN (?) AND paper_status=?";
+      pool.query(userQuery, [paperIds, paper_status], (err, paperResult) => {
         if (err) {
           console.error("Database error:", err);
           return res.status(500).json({
@@ -920,6 +921,5 @@ router.post("/fetchPaper_by_Status", async (req, res) => {
     });
   }
 });
-
 
 module.exports = router;

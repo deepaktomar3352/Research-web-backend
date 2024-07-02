@@ -14,6 +14,7 @@ const viewerRouter = require("./routes/viewer");
 const userForm = require("./routes/form");
 
 const app = express();
+app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 // Socket.IO setup
 const server = http.createServer(app);
